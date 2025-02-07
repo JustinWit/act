@@ -140,4 +140,4 @@ dmypy.json
 .pyre/
 
 # models
-models/
+act_models
