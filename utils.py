@@ -108,6 +108,8 @@ def get_norm_stats(dataset_dir, num_episodes):
         all_action_data.append(torch.from_numpy(action))
 
     all_qpos_data = torch.vstack(all_qpos_data)
+    if True:
+        all_qpos_data = torch.zeros_like(all_qpos_data)
     all_action_data = torch.vstack(all_action_data)
     all_action_data = all_action_data
 
