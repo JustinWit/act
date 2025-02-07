@@ -21,6 +21,10 @@ from sim_env import BOX_POSE
 import IPython
 e = IPython.embed
 
+
+import wandb
+wandb.login()
+
 def main(args):
     set_seed(1)
     # command line parameters
@@ -87,6 +91,12 @@ def main(args):
         'camera_names': camera_names,
         'real_robot': not is_sim
     }
+
+    wandb.init(
+        project='act-training',
+        config=config,
+        name=f'{task_name}',
+    )
 
     # if is_eval:
     #     ckpt_names = [f'policy_best.ckpt']
@@ -361,6 +371,7 @@ def train_bc(train_dataloader, val_dataloader, config):
         summary_string = ''
         for k, v in epoch_summary.items():
             summary_string += f'{k}: {v.item():.3f} '
+            wandb.log({f'val_{k}': v.item()})
         print(summary_string)
 
         # training
@@ -380,6 +391,7 @@ def train_bc(train_dataloader, val_dataloader, config):
         summary_string = ''
         for k, v in epoch_summary.items():
             summary_string += f'{k}: {v.item():.3f} '
+            wandb.log({f'train_{k}': v.item()})
         print(summary_string)
 
         if epoch % 100 == 0:
