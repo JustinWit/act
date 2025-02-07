@@ -2,7 +2,9 @@ import numpy as np
 import torch
 import os
 import h5py
+import pickle as pkl
 from torch.utils.data import TensorDataset, DataLoader
+import matplotlib.pyplot as plt
 
 import IPython
 e = IPython.embed
@@ -23,49 +25,58 @@ class EpisodicDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         sample_full_episode = False # hardcode
 
-        episode_id = self.episode_ids[index]
-        dataset_path = os.path.join(self.dataset_dir, f'episode_{episode_id}.hdf5')
-        with h5py.File(dataset_path, 'r') as root:
-            is_sim = root.attrs['sim']
-            original_action_shape = root['/action'].shape
+        # use f-string to format index to be three digits with leading zeros
+        episode_id = f'{self.episode_ids[index]:03d}'
+        dataset_path = os.path.join(self.dataset_dir, f'demo_{episode_id}.pkl')
+        with open(dataset_path, 'rb') as db:
+            root = pkl.load(db)
+
+            # is_sim = root.attrs['sim']
+            action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
+            original_action_shape = action.shape
             episode_len = original_action_shape[0]
             if sample_full_episode:
                 start_ts = 0
             else:
                 start_ts = np.random.choice(episode_len)
-            # get observation at start_ts only
-            qpos = root['/observations/qpos'][start_ts]
-            qvel = root['/observations/qvel'][start_ts]
-            image_dict = dict()
+            # get observation at start_ts only  TODO: don't know why this is the case
+            qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))[start_ts]
+            # qvel = root['/observations/qvel'][start_ts]
+            # image_dict = dict()
             for cam_name in self.camera_names:
-                image_dict[cam_name] = root[f'/observations/images/{cam_name}'][start_ts]
-            # get all actions after and including start_ts
-            if is_sim:
-                action = root['/action'][start_ts:]
-                action_len = episode_len - start_ts
-            else:
-                action = root['/action'][max(0, start_ts - 1):] # hack, to make timesteps more aligned
-                action_len = episode_len - max(0, start_ts - 1) # hack, to make timesteps more aligned
+                cam_image = root[cam_name][start_ts][2]
+                cam_image = cam_image[None, :]
 
-        self.is_sim = is_sim
+            # get all actions after and including start_ts
+            action_len = episode_len - start_ts
+            action = action[start_ts:]
+            # if is_sim:
+            #     action = root['/action'][start_ts:]
+            #     action_len = episode_len - start_ts
+            # else:
+            #     action = root['/action'][max(0, start_ts - 1):] # hack, to make timesteps more aligned
+            #     action_len = episode_len - max(0, start_ts - 1) # hack, to make timesteps more aligned
+
+        self.is_sim = False  # hardcode because ours should always be the same format
         padded_action = np.zeros(original_action_shape, dtype=np.float32)
         padded_action[:action_len] = action
         is_pad = np.zeros(episode_len)
         is_pad[action_len:] = 1
 
-        # new axis for different cameras
-        all_cam_images = []
-        for cam_name in self.camera_names:
-            all_cam_images.append(image_dict[cam_name])
-        all_cam_images = np.stack(all_cam_images, axis=0)
+        # new axis for different cameras NOTE: this is not necessary for our case we have single cam
+        # all_cam_images = []
+        # for cam_name in self.camera_names:
+        #     all_cam_images.append(cam_image)
+        # all_cam_images = np.stack(all_cam_images, axis=0)
+        # breakpoint()
 
         # construct observations
-        image_data = torch.from_numpy(all_cam_images)
+        image_data = torch.from_numpy(cam_image)
         qpos_data = torch.from_numpy(qpos).float()
         action_data = torch.from_numpy(padded_action).float()
         is_pad = torch.from_numpy(is_pad).bool()
 
-        # channel last
+        # channel last -> channel first
         image_data = torch.einsum('k h w c -> k c h w', image_data)
 
         # normalize image and change dtype to float
@@ -79,26 +90,30 @@ class EpisodicDataset(torch.utils.data.Dataset):
 def get_norm_stats(dataset_dir, num_episodes):
     all_qpos_data = []
     all_action_data = []
-    for episode_idx in range(num_episodes):
-        dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
-        with h5py.File(dataset_path, 'r') as root:
-            qpos = root['/observations/qpos'][()]
-            qvel = root['/observations/qvel'][()]
-            action = root['/action'][()]
+    for i, episode_path in enumerate(os.listdir(dataset_dir)):
+        # dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
+        with open(os.path.join(dataset_dir, episode_path), 'rb') as dbfile:
+            root = pkl.load(dbfile)
+            # get action and pose data
+            # qpos = root['/observations/qpos'][()]
+            qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))
+            # qvel = root['/observations/qvel'][()]
+            action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))  # TODO: do we need to include gripper action?
         all_qpos_data.append(torch.from_numpy(qpos))
         all_action_data.append(torch.from_numpy(action))
-    all_qpos_data = torch.stack(all_qpos_data)
-    all_action_data = torch.stack(all_action_data)
+
+    all_qpos_data = torch.vstack(all_qpos_data)
+    all_action_data = torch.vstack(all_action_data)
     all_action_data = all_action_data
 
     # normalize action data
-    action_mean = all_action_data.mean(dim=[0, 1], keepdim=True)
-    action_std = all_action_data.std(dim=[0, 1], keepdim=True)
+    action_mean = all_action_data.mean(dim=[0], keepdim=True)
+    action_std = all_action_data.std(dim=[0], keepdim=True)
     action_std = torch.clip(action_std, 1e-2, np.inf) # clipping
 
     # normalize qpos data
-    qpos_mean = all_qpos_data.mean(dim=[0, 1], keepdim=True)
-    qpos_std = all_qpos_data.std(dim=[0, 1], keepdim=True)
+    qpos_mean = all_qpos_data.mean(dim=[0], keepdim=True)
+    qpos_std = all_qpos_data.std(dim=[0], keepdim=True)
     qpos_std = torch.clip(qpos_std, 1e-2, np.inf) # clipping
 
     stats = {"action_mean": action_mean.numpy().squeeze(), "action_std": action_std.numpy().squeeze(),
@@ -106,6 +121,19 @@ def get_norm_stats(dataset_dir, num_episodes):
              "example_qpos": qpos}
 
     return stats
+
+
+def collate_fn(batch):
+    image_data, qpos_data, action_data, is_pad = zip(*batch)
+
+    image_data = torch.stack(image_data)
+    qpos_data = torch.stack(qpos_data)
+
+    # need to add padding so that all sequences have the same length
+    action_data = torch.nn.utils.rnn.pad_sequence(action_data, padding_value=0, batch_first=True)
+    is_pad = torch.nn.utils.rnn.pad_sequence(is_pad, padding_value=1, batch_first=True)
+    batch = (image_data, qpos_data, action_data, is_pad)
+    return batch
 
 
 def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_size_val):
@@ -122,8 +150,8 @@ def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_s
     # construct dataset and dataloader
     train_dataset = EpisodicDataset(train_indices, dataset_dir, camera_names, norm_stats)
     val_dataset = EpisodicDataset(val_indices, dataset_dir, camera_names, norm_stats)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size_val, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1, collate_fn=collate_fn)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size_val, shuffle=True, pin_memory=True, num_workers=1, prefetch_factor=1, collate_fn=collate_fn)
 
     return train_dataloader, val_dataloader, norm_stats, train_dataset.is_sim
 
