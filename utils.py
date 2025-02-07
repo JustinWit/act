@@ -40,11 +40,16 @@ class EpisodicDataset(torch.utils.data.Dataset):
             else:
                 start_ts = np.random.choice(episode_len)
             # get observation at start_ts only  TODO: don't know why this is the case
-            qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))[start_ts]
+            if True:
+                qpos = np.zeros(7)
+            else:
+                qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))[start_ts]
             # qvel = root['/observations/qvel'][start_ts]
             # image_dict = dict()
             for cam_name in self.camera_names:
                 cam_image = root[cam_name][start_ts][2]
+                # convert bgr to rgb
+                cam_image = cam_image[..., ::-1]
                 cam_image = cam_image[None, :]
 
             # get all actions after and including start_ts
@@ -71,7 +76,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
         # breakpoint()
 
         # construct observations
-        image_data = torch.from_numpy(cam_image)
+        image_data = torch.from_numpy(cam_image.copy())
         qpos_data = torch.from_numpy(qpos).float()
         action_data = torch.from_numpy(padded_action).float()
         is_pad = torch.from_numpy(is_pad).bool()
