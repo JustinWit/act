@@ -51,7 +51,7 @@ def main(args):
     camera_names = task_config['camera_names']
 
     # fixed parameters
-    state_dim = 14  # TODO: I don't think we need to change this because its not passed to what makes the model
+    state_dim = 7  # TODO: I don't think we need to change this because its not passed to what makes the model
     lr_backbone = 1e-5
     backbone = 'resnet18'
     if policy_class.upper() == 'ACT':
