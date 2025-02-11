@@ -5,6 +5,7 @@ import h5py
 import pickle as pkl
 from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
+from PIL import Image
 
 import IPython
 e = IPython.embed
@@ -18,7 +19,8 @@ class EpisodicDataset(torch.utils.data.Dataset):
         self.norm_stats = norm_stats
         self.is_sim = None
         self.use_proprio = proprioception
-        self.__getitem__(0) # initialize self.is_sim
+        # self.__getitem__(0) # initialize self.is_sim
+        self.is_sim = False
 
     def __len__(self):
         return len(self.episode_ids)
@@ -40,7 +42,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
             start_ts = 0
         else:
             start_ts = np.random.choice(episode_len)
-        # get observation at start_ts only  TODO: don't know why this is the case
+        # get observation at start_ts only
         if self.use_proprio:
             qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))[start_ts]
         else:
@@ -51,7 +53,15 @@ class EpisodicDataset(torch.utils.data.Dataset):
             cam_image = root[cam_name][start_ts][2]
             # convert bgr to rgb
             cam_image = cam_image[..., ::-1]
+            if cam_image.shape == (360, 640, 3):
+                # center crop to 360 x 360
+                cam_image = cam_image[:, 140: 500]
+                # downsize to 256 x 256
+                cam_image = np.array(Image.fromarray(cam_image).resize((256, 256)))
+            else:
+                assert cam_image.shape == (256, 256, 3)
             cam_image = cam_image[None, :]
+        # plt.imsave('img.png', cam_image[0])
 
         # get all actions after and including start_ts
         action_len = episode_len - start_ts
@@ -63,7 +73,6 @@ class EpisodicDataset(torch.utils.data.Dataset):
         #     action = root['/action'][max(0, start_ts - 1):] # hack, to make timesteps more aligned
         #     action_len = episode_len - max(0, start_ts - 1) # hack, to make timesteps more aligned
 
-        self.is_sim = False  # hardcode because ours should always be the same format
         padded_action = np.zeros(original_action_shape, dtype=np.float32)
         padded_action[:action_len] = action
         is_pad = np.zeros(episode_len)
@@ -103,7 +112,7 @@ def get_norm_stats(dataset_dir, num_episodes, proprioception=True):
         # qpos = root['/observations/qpos'][()]
         qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))
         # qvel = root['/observations/qvel'][()]
-        action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))  # TODO: do we need to include gripper action?
+        action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
         all_qpos_data.append(torch.from_numpy(qpos))
         all_action_data.append(torch.from_numpy(action))
 
@@ -111,7 +120,6 @@ def get_norm_stats(dataset_dir, num_episodes, proprioception=True):
     if not proprioception:
         all_qpos_data = torch.zeros_like(all_qpos_data)
     all_action_data = torch.vstack(all_action_data)
-    all_action_data = all_action_data
 
     # normalize action data
     action_mean = all_action_data.mean(dim=[0], keepdim=True)
