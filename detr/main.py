@@ -63,7 +63,8 @@ def get_args_parser():
     parser.add_argument('--kl_weight', action='store', type=int, help='KL Weight', required=False)
     parser.add_argument('--chunk_size', action='store', type=int, help='chunk_size', required=False)
     parser.add_argument('--temporal_agg', action='store_true')
-
+    parser.add_argument('--run_name', action='store', type=str, help='run_name', required=True)
+    parser.add_argument('--no_proprioception', action='store_true')
     return parser
 
 

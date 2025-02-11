@@ -23,7 +23,6 @@ e = IPython.embed
 
 
 import wandb
-wandb.login()
 
 def main(args):
     set_seed(1)
@@ -95,7 +94,8 @@ def main(args):
     wandb.init(
         project='act-training',
         config=config,
-        name=f'{task_name}',
+        name=args['run_name'],
+        entity="jwit3-georgia-institute-of-technology",
     )
 
     # if is_eval:
@@ -110,7 +110,14 @@ def main(args):
     #     print()
     #     exit()
 
-    train_dataloader, val_dataloader, stats, _ = load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_size_val)
+    train_dataloader, val_dataloader, stats, _ = load_data(
+        dataset_dir,
+        num_episodes,
+        camera_names,
+        batch_size_train,
+        batch_size_val,
+        proprioception=not args['no_proprioception'],
+        )
 
     # save dataset stats
     if not os.path.isdir(ckpt_dir):
@@ -326,12 +333,7 @@ def get_image(ts, camera_names):
 def forward_pass(data, policy):
     image_data, qpos_data, action_data, is_pad = data
     image_data, qpos_data, action_data, is_pad = image_data.cuda(), qpos_data.cuda(), action_data.cuda(), is_pad.cuda()
-
-    image_data = image_data.type(torch.float32)
-    action_data = action_data.type(torch.float32)
-    qpos_data = qpos_data.type(torch.float32)
-
-    return policy(qpos_data, image_data, action_data, is_pad) # TODO remove None
+    return policy(qpos_data, image_data, action_data, is_pad)
 
 
 def train_bc(train_dataloader, val_dataloader, config):
@@ -371,7 +373,8 @@ def train_bc(train_dataloader, val_dataloader, config):
         summary_string = ''
         for k, v in epoch_summary.items():
             summary_string += f'{k}: {v.item():.3f} '
-            wandb.log({f'val_{k}': v.item()})
+            if epoch % 10 == 0:
+                wandb.log({f'val_{k}': v.item()})
         print(summary_string)
 
         # training
@@ -388,11 +391,11 @@ def train_bc(train_dataloader, val_dataloader, config):
         epoch_summary = compute_dict_mean(train_history[(batch_idx+1)*epoch:(batch_idx+1)*(epoch+1)])
         epoch_train_loss = epoch_summary['loss']
         print(f'Train loss: {epoch_train_loss:.5f}')
-        summary_string = ''
-        for k, v in epoch_summary.items():
-            summary_string += f'{k}: {v.item():.3f} '
-            wandb.log({f'train_{k}': v.item()})
-        print(summary_string)
+        # summary_string = ''
+        # for k, v in epoch_summary.items():
+        #     summary_string += f'{k}: {v.item():.3f} '
+        #     wandb.log({f'train_{k}': v.item()})
+        # print(summary_string)
 
         if epoch % 100 == 0:
             ckpt_path = os.path.join(ckpt_dir, f'policy_epoch_{epoch}_seed_{seed}.ckpt')
@@ -441,6 +444,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', action='store', type=int, help='seed', required=True)
     parser.add_argument('--num_epochs', action='store', type=int, help='num_epochs', required=True)
     parser.add_argument('--lr', action='store', type=float, help='lr', required=True)
+    parser.add_argument('--run_name', action='store', type=str, help='run_name', required=True)
 
     # for ACT
     parser.add_argument('--kl_weight', action='store', type=int, help='KL Weight', required=False)
@@ -448,5 +452,6 @@ if __name__ == '__main__':
     parser.add_argument('--hidden_dim', action='store', type=int, help='hidden_dim', required=False)
     parser.add_argument('--dim_feedforward', action='store', type=int, help='dim_feedforward', required=False)
     parser.add_argument('--temporal_agg', action='store_true')
+    parser.add_argument('--no_proprioception', action='store_true')
 
     main(vars(parser.parse_args()))
