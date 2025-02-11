@@ -40,6 +40,12 @@ TASK_CONFIGS = {
         'episode_len': 152,  # TODO where is this used?
         'camera_names': ['rgb_frames']
     },
+    'real_pick_coke_half':{
+        'dataset_dir': DATA_DIR + '/real_pick_coke_half',
+        'num_episodes': 20,
+        'episode_len': 152,  # TODO where is this used?
+        'camera_names': ['rgb_frames']
+    },
 }
 
 ### Simulation envs fixed constants

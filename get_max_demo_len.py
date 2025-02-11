@@ -2,9 +2,9 @@ import os
 import pickle as pkl
 from tqdm import tqdm
 
-pkl_dir = "/data3/act_data/real_pick_coke"
+pkl_dir = "/data3/act_data/real_pick_coke_half"
 max_demo_len = 0
-for i in tqdm(range(40)):
+for i in tqdm(range(20)):
     # format like 000, 001, 002, etc
     pkl_path = os.path.join(pkl_dir, f"demo_{i:03d}.pkl")
     with open(pkl_path, 'rb') as f:
