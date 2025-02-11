@@ -6,5 +6,7 @@
 # SBATCH --qos=short
 
 set -ex
-
+USER=$(whoami)
+source /coc/testnvme/$USER/.bashrc
+conda activate aloha
 bash train.bash $1
