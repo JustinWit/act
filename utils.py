@@ -178,7 +178,7 @@ def load_data(
 
     print(f'\nData from: {dataset_dir}\n')
     # obtain train test split
-    train_ratio = 0.8
+    train_ratio = 1.0
     shuffled_indices = np.random.permutation(num_episodes)
     train_indices = shuffled_indices[:int(train_ratio * num_episodes)]
     val_indices = shuffled_indices[int(train_ratio * num_episodes):]
@@ -201,15 +201,15 @@ def load_data(
         chunk_size=chunk_size,
         all_demos=all_demos if preload_data else None,
         )
-    val_dataset = EpisodicDataset(
-        val_indices,
-        dataset_dir,
-        camera_names,
-        norm_stats,
-        proprioception=proprioception,
-        chunk_size=chunk_size,
-        all_demos=all_demos if preload_data else None,
-        )
+    # val_dataset = EpisodicDataset(
+    #     val_indices,
+    #     dataset_dir,
+    #     camera_names,
+    #     norm_stats,
+    #     proprioception=proprioception,
+    #     chunk_size=chunk_size,
+    #     all_demos=all_demos if preload_data else None,
+    #     )
     n_workers = 0
     prefetch = None
     train_dataloader = DataLoader(
@@ -221,15 +221,16 @@ def load_data(
         prefetch_factor=prefetch,
         collate_fn=collate_fn,
         )
-    val_dataloader = DataLoader(
-        val_dataset,
-        batch_size=batch_size_val,
-        shuffle=True,
-        pin_memory=True,
-        num_workers=n_workers,
-        prefetch_factor=prefetch,
-        collate_fn=collate_fn,
-        )
+    # val_dataloader = DataLoader(
+    #     val_dataset,
+    #     batch_size=batch_size_val,
+    #     shuffle=True,
+    #     pin_memory=True,
+    #     num_workers=n_workers,
+    #     prefetch_factor=prefetch,
+    #     collate_fn=collate_fn,
+    #     )
+    val_dataloader = None
 
     return train_dataloader, val_dataloader, norm_stats, train_dataset.is_sim
 

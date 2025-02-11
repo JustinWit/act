@@ -357,6 +357,7 @@ def train_bc(train_dataloader, val_dataloader, config):
     best_ckpt_info = None
     for epoch in tqdm(range(num_epochs)):
         print(f'\nEpoch {epoch}')
+        '''
         # validation
         with torch.inference_mode():
             policy.eval()
@@ -380,6 +381,7 @@ def train_bc(train_dataloader, val_dataloader, config):
             if epoch % 10 == 0:
                 wandb.log({f'val_{k}': v.item()})
         print(summary_string)
+        '''
 
         # training
         policy.train()
