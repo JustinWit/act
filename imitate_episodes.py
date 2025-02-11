@@ -93,7 +93,7 @@ def main(args):
 
 
     if is_eval:
-        ckpt_name = f'policy_epoch_4900_seed_0.ckpt'
+        ckpt_name = args['ckpt_name']
         eval_bc(config, ckpt_name, not args['no_proprioception'], save_episode=True)
         exit()
 
@@ -208,7 +208,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     # Initialize robot
     robot_interface = FrankaInterface(
         os.path.join('/home/ripl/openteach/configs', 'deoxys.yml'), use_visualizer=False,
-        control_freq=1,  # TODO: change this to 5 or even higher?
+        control_freq=5,  # TODO: change this to 5 or even higher?
         state_freq=200
     )  # copied from playback_demo.py
 
@@ -242,7 +242,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    max_timesteps = int(max_timesteps * 1) # may increase for real-world tasks
+    max_timesteps = int(max_timesteps * 2) # may increase for real-world tasks
 
     num_rollouts = 1
 #     episode_returns = []
@@ -288,14 +288,14 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
                 # process and store image
                 color_frame = color_frame[:, 140:500]  # center crop 360x360
-                color_frame = cv2.resize(color_frame, (224, 224))  # resize for image processor TODO: do we still do this?
+                color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
                 color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB
                 image_list.append(color_frame)
 
                 if proprioception:
                     qpos = robot_interface.last_eef_quat_and_pos
                     qpos_numpy = np.concatenate([qpos[1].flatten(), qpos[0]])
-                    qpos = pre_process(qpos)
+                    qpos = pre_process(qpos_numpy)
                 else:
                     qpos = np.zeros(7)
                     qpos_numpy = np.zeros(7)
@@ -514,5 +514,6 @@ if __name__ == '__main__':
     parser.add_argument('--dim_feedforward', action='store', type=int, help='dim_feedforward', required=False)
     parser.add_argument('--temporal_agg', action='store_true')
     parser.add_argument('--no_proprioception', action='store_true')
+    parser.add_argument('--ckpt_name', action='store', type=str, help='ckpt_name', required=False)
 
     main(vars(parser.parse_args()))
