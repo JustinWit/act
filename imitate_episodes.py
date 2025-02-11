@@ -398,6 +398,8 @@ def train_bc(train_dataloader, val_dataloader, config):
         epoch_train_loss = epoch_summary['loss']
         print(f'Train loss: {epoch_train_loss:.5f}')
         summary_string = ''
+        if epoch % 10 == 0:
+            wandb.log({'epoch': epoch})
         for k, v in epoch_summary.items():
             summary_string += f'{k}: {v.item():.3f} '
             if epoch % 10 == 0:
