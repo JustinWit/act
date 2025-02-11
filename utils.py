@@ -11,7 +11,7 @@ import IPython
 e = IPython.embed
 
 class EpisodicDataset(torch.utils.data.Dataset):
-    def __init__(self, episode_ids, dataset_dir, camera_names, norm_stats, proprioception=True):
+    def __init__(self, episode_ids, dataset_dir, camera_names, norm_stats, proprioception=True, chunk_size=None, all_demos=None):
         super(EpisodicDataset).__init__()
         self.episode_ids = episode_ids
         self.dataset_dir = dataset_dir
@@ -21,18 +21,22 @@ class EpisodicDataset(torch.utils.data.Dataset):
         self.use_proprio = proprioception
         # self.__getitem__(0) # initialize self.is_sim
         self.is_sim = False
+        self.chunk_size = chunk_size
+        self.all_demos = all_demos
 
     def __len__(self):
         return len(self.episode_ids)
 
     def __getitem__(self, index):
         sample_full_episode = False # hardcode
-
-        # use f-string to format index to be three digits with leading zeros
-        episode_id = f'{self.episode_ids[index]:03d}'
-        dataset_path = os.path.join(self.dataset_dir, f'demo_{episode_id}.pkl')
-        with open(dataset_path, 'rb') as db:
-            root = pkl.load(db)
+        if self.all_demos is None:
+            # use f-string to format index to be three digits with leading zeros
+            episode_id = f'{self.episode_ids[index]:03d}'
+            dataset_path = os.path.join(self.dataset_dir, f'demo_{episode_id}.pkl')
+            with open(dataset_path, 'rb') as db:
+                root = pkl.load(db)
+        else:
+            root = self.all_demos[index]
 
         # is_sim = root.attrs['sim']
         action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
@@ -98,16 +102,27 @@ class EpisodicDataset(torch.utils.data.Dataset):
         image_data = image_data / 255.0
         action_data = (action_data - self.norm_stats["action_mean"]) / self.norm_stats["action_std"]
         qpos_data = (qpos_data - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]
+        # added this since the actions just get truncated by the model anyways
+        action_data = action_data[:self.chunk_size]
+        is_pad = is_pad[:self.chunk_size]
         return image_data.float(), qpos_data.float(), action_data.float(), is_pad
 
 
-def get_norm_stats(dataset_dir, num_episodes, proprioception=True):
+def get_norm_stats(
+    dataset_dir,
+    num_episodes,
+    proprioception=True,
+    preload_data=False,
+    ):
     all_qpos_data = []
     all_action_data = []
+    all_demos = []
     for i, episode_path in enumerate(os.listdir(dataset_dir)):
         # dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
         with open(os.path.join(dataset_dir, episode_path), 'rb') as dbfile:
             root = pkl.load(dbfile)
+        if preload_data:
+            all_demos.append(root)
         # get action and pose data
         # qpos = root['/observations/qpos'][()]
         qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))
@@ -135,7 +150,7 @@ def get_norm_stats(dataset_dir, num_episodes, proprioception=True):
              "qpos_mean": qpos_mean.numpy().squeeze(), "qpos_std": qpos_std.numpy().squeeze(),
              "example_qpos": qpos}
 
-    return stats
+    return stats, all_demos
 
 
 def collate_fn(batch):
@@ -143,7 +158,6 @@ def collate_fn(batch):
 
     image_data = torch.stack(image_data)
     qpos_data = torch.stack(qpos_data)
-
     # need to add padding so that all sequences have the same length
     action_data = torch.nn.utils.rnn.pad_sequence(action_data, padding_value=0, batch_first=True)
     is_pad = torch.nn.utils.rnn.pad_sequence(is_pad, padding_value=1, batch_first=True)
@@ -151,7 +165,17 @@ def collate_fn(batch):
     return batch
 
 
-def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_size_val, proprioception=True):
+def load_data(
+    dataset_dir,
+    num_episodes,
+    camera_names,
+    batch_size_train,
+    batch_size_val,
+    proprioception=True,
+    chunk_size=None,
+    preload_data=False,
+    ):
+
     print(f'\nData from: {dataset_dir}\n')
     # obtain train test split
     train_ratio = 0.8
@@ -160,15 +184,52 @@ def load_data(dataset_dir, num_episodes, camera_names, batch_size_train, batch_s
     val_indices = shuffled_indices[int(train_ratio * num_episodes):]
 
     # obtain normalization stats for qpos and action
-    norm_stats = get_norm_stats(dataset_dir, num_episodes, proprioception=proprioception)
+    norm_stats, all_demos = get_norm_stats(
+        dataset_dir,
+        num_episodes,
+        proprioception=proprioception,
+        preload_data=preload_data,
+        )
 
     # construct dataset and dataloader
-    train_dataset = EpisodicDataset(train_indices, dataset_dir, camera_names, norm_stats, proprioception=proprioception)
-    val_dataset = EpisodicDataset(val_indices, dataset_dir, camera_names, norm_stats, proprioception=proprioception)
-    n_workers = 1
+    train_dataset = EpisodicDataset(
+        train_indices,
+        dataset_dir,
+        camera_names,
+        norm_stats,
+        proprioception=proprioception,
+        chunk_size=chunk_size,
+        all_demos=all_demos if preload_data else None,
+        )
+    val_dataset = EpisodicDataset(
+        val_indices,
+        dataset_dir,
+        camera_names,
+        norm_stats,
+        proprioception=proprioception,
+        chunk_size=chunk_size,
+        all_demos=all_demos if preload_data else None,
+        )
+    n_workers = 0
     prefetch = None
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size_train, shuffle=True, pin_memory=True, num_workers=n_workers, prefetch_factor=prefetch, collate_fn=collate_fn)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size_val, shuffle=True, pin_memory=True, num_workers=n_workers, prefetch_factor=prefetch, collate_fn=collate_fn)
+    train_dataloader = DataLoader(
+        train_dataset,
+        batch_size=batch_size_train,
+        shuffle=True,
+        pin_memory=True,
+        num_workers=n_workers,
+        prefetch_factor=prefetch,
+        collate_fn=collate_fn,
+        )
+    val_dataloader = DataLoader(
+        val_dataset,
+        batch_size=batch_size_val,
+        shuffle=True,
+        pin_memory=True,
+        num_workers=n_workers,
+        prefetch_factor=prefetch,
+        collate_fn=collate_fn,
+        )
 
     return train_dataloader, val_dataloader, norm_stats, train_dataset.is_sim
 

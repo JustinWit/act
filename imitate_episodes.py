@@ -117,6 +117,8 @@ def main(args):
         batch_size_train,
         batch_size_val,
         proprioception=not args['no_proprioception'],
+        chunk_size=args['chunk_size'],
+        preload_data=args['preload_data'],
         )
 
     # save dataset stats
@@ -456,5 +458,6 @@ if __name__ == '__main__':
     parser.add_argument('--dim_feedforward', action='store', type=int, help='dim_feedforward', required=False)
     parser.add_argument('--temporal_agg', action='store_true')
     parser.add_argument('--no_proprioception', action='store_true')
+    parser.add_argument('--preload_data', action='store_true')
 
     main(vars(parser.parse_args()))

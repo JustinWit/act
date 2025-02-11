@@ -65,6 +65,7 @@ def get_args_parser():
     parser.add_argument('--temporal_agg', action='store_true')
     parser.add_argument('--run_name', action='store', type=str, help='run_name', required=True)
     parser.add_argument('--no_proprioception', action='store_true')
+    parser.add_argument('--preload_data', action='store_true')
     return parser
 
 

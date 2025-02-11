@@ -8,4 +8,5 @@ python imitate_episodes.py \
 --num_epochs 12000 --lr 1e-4 \
 --seed 0 \
 --run_name $1 \
+--preload_data \
 --no_proprioception \
