@@ -1,4 +1,5 @@
 #!/bin/bash
+set -ex
 
 python imitate_episodes.py \
 --task_name real_pick_coke_half \
