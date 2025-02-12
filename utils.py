@@ -54,7 +54,14 @@ class EpisodicDataset(torch.utils.data.Dataset):
         # qvel = root['/observations/qvel'][start_ts]
         # image_dict = dict()
         for cam_name in self.camera_names:
-            cam_image = root[cam_name][start_ts][2]
+            if root[cam_name].shape[1] == 3:  # real data has 3 cams
+                cam_image = root[cam_name][start_ts][2]
+                assert cam_image.shape == (360, 640, 3)
+            elif root[cam_name].shape[1] == 1:  # sim data has one cam
+                cam_image = root[cam_name][start_ts][0]
+                assert cam_image.shape == (256, 256, 3)
+            else:
+                raise ValueError('Unknown camera shape')
             # convert bgr to rgb
             cam_image = cam_image[..., ::-1]
             if cam_image.shape == (360, 640, 3):

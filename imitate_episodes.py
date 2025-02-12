@@ -17,6 +17,7 @@ from policy import ACTPolicy, CNNMLPPolicy
 from visualize_episodes import save_videos
 
 from sim_env import BOX_POSE
+from constants import TASK_CONFIGS
 
 import IPython
 e = IPython.embed
@@ -30,27 +31,27 @@ def main(args):
     is_eval = args['eval']
     ckpt_dir = args['ckpt_dir']
     policy_class = args['policy_class']
-    onscreen_render = args['onscreen_render']
+    # onscreen_render = args['onscreen_render']
     task_name = args['task_name']
     batch_size_train = args['batch_size']
     batch_size_val = args['batch_size']
     num_epochs = args['num_epochs']
+    log_wandb = not args['no_wandb']
 
     # get task parameters
-    is_sim = task_name[:4] == 'sim_'
-    if is_sim:
-        from constants import SIM_TASK_CONFIGS
-        task_config = SIM_TASK_CONFIGS[task_name]
-    else:
-        from constants import TASK_CONFIGS
-        task_config = TASK_CONFIGS[task_name]
+    # is_sim = task_name[:4] == 'sim_'
+    # if is_sim:
+    #     from constants import SIM_TASK_CONFIGS
+    #     task_config = SIM_TASK_CONFIGS[task_name]
+    # else:
+    task_config = TASK_CONFIGS[task_name]
     dataset_dir = task_config['dataset_dir']
     num_episodes = task_config['num_episodes']
     episode_len = task_config['episode_len']
     camera_names = task_config['camera_names']
 
     # fixed parameters
-    state_dim = 7  # TODO: I don't think we need to change this because its not passed to what makes the model
+    state_dim = 7
     lr_backbone = 1e-5
     backbone = 'resnet18'
     if policy_class.upper() == 'ACT':
@@ -82,21 +83,28 @@ def main(args):
         'state_dim': state_dim,
         'lr': args['lr'],
         'policy_class': policy_class,
-        'onscreen_render': onscreen_render,
+        # 'onscreen_render': onscreen_render,
         'policy_config': policy_config,
         'task_name': task_name,
         'seed': args['seed'],
         'temporal_agg': args['temporal_agg'],
         'camera_names': camera_names,
-        'real_robot': not is_sim
+        'real_robot': not is_sim,
+        'log_wandb': log_wandb,
     }
 
-    wandb.init(
-        project='act-training',
-        config=config,
-        name=args['run_name'],
-        entity="jwit3-georgia-institute-of-technology",
-    )
+    if is_eval:
+        ckpt_name = args['ckpt_name']
+        eval_bc(config, ckpt_name, not args['no_proprioception'], save_episode=True)
+        exit()
+
+    if log_wandb:
+        wandb.init(
+            project='act-training',
+            config=config,
+            name=args['run_name'],
+            entity="jwit3-georgia-institute-of-technology",
+        )
 
     # if is_eval:
     #     ckpt_names = [f'policy_best.ckpt']
@@ -167,34 +175,72 @@ def get_image(ts, camera_names):
     return curr_image
 
 
-# def eval_bc(config, ckpt_name, save_episode=True):
-#     set_seed(1000)
-#     ckpt_dir = config['ckpt_dir']
-#     state_dim = config['state_dim']
-#     real_robot = config['real_robot']
-#     policy_class = config['policy_class']
-#     onscreen_render = config['onscreen_render']
-#     policy_config = config['policy_config']
-#     camera_names = config['camera_names']
-#     max_timesteps = config['episode_len']
-#     task_name = config['task_name']
-#     temporal_agg = config['temporal_agg']
-#     onscreen_cam = 'angle'
+def eval_bc(config, ckpt_name, proprioception, save_episode=True):
+    # Imports for controlling Robot
+    from openteach.utils.network import ZMQCameraSubscriber
+    from deoxys.franka_interface import FrankaInterface
+    from deoxys.utils.config_utils import get_default_controller_config
+    from deoxys.experimental.motion_utils import reset_joints_to
+    from deoxys.utils.transform_utils import quat2axisangle, mat2quat, euler2mat
+    import cv2
 
-#     # load policy and stats
-#     ckpt_path = os.path.join(ckpt_dir, ckpt_name)
-#     policy = make_policy(policy_class, policy_config)
-#     loading_status = policy.load_state_dict(torch.load(ckpt_path))
-#     print(loading_status)
-#     policy.cuda()
-#     policy.eval()
-#     print(f'Loaded: {ckpt_path}')
-#     stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
-#     with open(stats_path, 'rb') as f:
-#         stats = pickle.load(f)
+    # ACT variables
+    set_seed(1000)
+    ckpt_dir = config['ckpt_dir']
+    state_dim = config['state_dim']
+    real_robot = config['real_robot']
+    policy_class = config['policy_class']
+    # onscreen_render = config['onscreen_render']
+    policy_config = config['policy_config']
+    camera_names = config['camera_names']
+    max_timesteps = config['episode_len']
+    task_name = config['task_name']
+    temporal_agg = config['temporal_agg']
+    # onscreen_cam = 'angle'
 
-#     pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean']) / stats['qpos_std']
-#     post_process = lambda a: a * stats['action_std'] + stats['action_mean']
+    # load policy and stats
+    ckpt_path = os.path.join(ckpt_dir, ckpt_name)
+    policy = make_policy(policy_class, policy_config)
+    loading_status = policy.load_state_dict(torch.load(ckpt_path))
+    print(loading_status)
+    policy.cuda()
+    policy.eval()
+    print(f'Loaded: {ckpt_path}')
+    stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
+    with open(stats_path, 'rb') as f:
+        stats = pickle.load(f)
+
+    pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean']) / stats['qpos_std']
+    post_process = lambda a: a * stats['action_std'] + stats['action_mean']
+
+
+    # Configure Camera Stream
+    image_subscriber = ZMQCameraSubscriber(
+            host = "143.215.128.151",
+            port = "10007",  # 5 - top, 6 - side, 7 - front
+            topic_type = 'RGB'
+        )
+
+    # Initialize robot
+    robot_interface = FrankaInterface(
+        os.path.join('/home/ripl/openteach/configs', 'deoxys.yml'), use_visualizer=False,
+        control_freq=5,  # TODO: change this to 5 or even higher?
+        state_freq=200
+    )  # copied from playback_demo.py
+
+    from constants import DEFAULT_CONTROLLER
+    # Golden resetting joints
+    reset_joint_positions = [
+            0.09162008114028396,
+            -0.19826458111314524,
+            -0.01990020486871322,
+            -2.4732269941140346,
+            -0.01307073642274261,
+            2.30396583422025,
+            0.8480939705504309,
+        ]
+
+    reset_joints_to(robot_interface, reset_joint_positions)  # reset joints to home position
 
 #     # load environment
 #     if real_robot:
@@ -207,17 +253,17 @@ def get_image(ts, camera_names):
 #         env = make_sim_env(task_name)
 #         env_max_reward = env.task.max_reward
 
-#     query_frequency = policy_config['num_queries']
-#     if temporal_agg:
-#         query_frequency = 1
-#         num_queries = policy_config['num_queries']
+    query_frequency = policy_config['num_queries']
+    if temporal_agg:
+        query_frequency = 1
+        num_queries = policy_config['num_queries']
 
-#     max_timesteps = int(max_timesteps * 1) # may increase for real-world tasks
+    max_timesteps = int(max_timesteps * 2) # may increase for real-world tasks
 
-#     num_rollouts = 50
+    num_rollouts = 1
 #     episode_returns = []
 #     highest_rewards = []
-#     for rollout_id in range(num_rollouts):
+    for rollout_id in range(num_rollouts):
 #         rollout_id += 0
 #         ### set task
 #         if 'sim_transfer_cube' in task_name:
@@ -233,73 +279,105 @@ def get_image(ts, camera_names):
 #             plt_img = ax.imshow(env._physics.render(height=480, width=640, camera_id=onscreen_cam))
 #             plt.ion()
 
-#         ### evaluation loop
-#         if temporal_agg:
-#             all_time_actions = torch.zeros([max_timesteps, max_timesteps+num_queries, state_dim]).cuda()
+        ### evaluation loop
+        if temporal_agg:
+            all_time_actions = torch.zeros([max_timesteps, max_timesteps+num_queries, state_dim]).cuda()
 
-#         qpos_history = torch.zeros((1, max_timesteps, state_dim)).cuda()
-#         image_list = [] # for visualization
-#         qpos_list = []
-#         target_qpos_list = []
+        qpos_history = torch.zeros((1, max_timesteps, state_dim)).cuda()
+        image_list = [] # for visualization
+        qpos_list = []
+        target_qpos_list = []
 #         rewards = []
-#         with torch.inference_mode():
-#             for t in range(max_timesteps):
+        with torch.inference_mode():
+            for t in range(max_timesteps):
 #                 ### update onscreen render and wait for DT
 #                 if onscreen_render:
 #                     image = env._physics.render(height=480, width=640, camera_id=onscreen_cam)
 #                     plt_img.set_data(image)
 #                     plt.pause(DT)
 
-#                 ### process previous timestep to get qpos and image_list
-#                 obs = ts.observation
-#                 if 'images' in obs:
-#                     image_list.append(obs['images'])
-#                 else:
-#                     image_list.append({'main': obs['image']})
-#                 qpos_numpy = np.array(obs['qpos'])
-#                 qpos = pre_process(qpos_numpy)
-#                 qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
-#                 qpos_history[:, t] = qpos
-#                 curr_image = get_image(ts, camera_names)
+                ### process previous timestep to get qpos and image_list
+                frames = image_subscriber.recv_rgb_image()
+                color_frame = frames[0]
+                if color_frame is None:
+                    continue
 
-#                 ### query policy
-#                 if config['policy_class'] == "ACT":
-#                     if t % query_frequency == 0:
-#                         all_actions = policy(qpos, curr_image)
-#                     if temporal_agg:
-#                         all_time_actions[[t], t:t+num_queries] = all_actions
-#                         actions_for_curr_step = all_time_actions[:, t]
-#                         actions_populated = torch.all(actions_for_curr_step != 0, axis=1)
-#                         actions_for_curr_step = actions_for_curr_step[actions_populated]
-#                         k = 0.01
-#                         exp_weights = np.exp(-k * np.arange(len(actions_for_curr_step)))
-#                         exp_weights = exp_weights / exp_weights.sum()
-#                         exp_weights = torch.from_numpy(exp_weights).cuda().unsqueeze(dim=1)
-#                         raw_action = (actions_for_curr_step * exp_weights).sum(dim=0, keepdim=True)
-#                     else:
-#                         raw_action = all_actions[:, t % query_frequency]
-#                 elif config['policy_class'] == "CNNMLP":
-#                     raw_action = policy(qpos, curr_image)
-#                 else:
-#                     raise NotImplementedError
+                # process and store image
+                assert color_frame.shape == (360, 640, 3)
+                color_frame = color_frame[:, 140:500]  # center crop 360x360
+                color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
+                color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB TODO double check this
+                plt.imsave(f'img.png', color_frame)
+                breakpoint()
+                image_list.append(color_frame)
 
-#                 ### post-process actions
-#                 raw_action = raw_action.squeeze(0).cpu().numpy()
-#                 action = post_process(raw_action)
-#                 target_qpos = action
+                if proprioception:
+                    qpos = robot_interface.last_eef_quat_and_pos
+                    qpos_numpy = np.concatenate([qpos[1].flatten(), qpos[0]])
+                    breakpoint() # TODO make sure this is correct
+                    qpos = pre_process(qpos_numpy)
+                else:
+                    qpos = np.zeros(7)
+                    qpos_numpy = np.zeros(7)
+                qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
+                qpos_history[:, t] = qpos
+                curr_image = torch.from_numpy(color_frame / 255.).unsqueeze(0).float().cuda()
+                curr_image = torch.einsum('k h w c -> k c h w', curr_image).unsqueeze(0)
 
-#                 ### step the environment
-#                 ts = env.step(target_qpos)
+                ### query policy
+                if config['policy_class'] == "ACT":
+                    if t % query_frequency == 0:
+                        all_actions = policy(qpos, curr_image)
+                    if temporal_agg:
+                        all_time_actions[[t], t:t+num_queries] = all_actions
+                        actions_for_curr_step = all_time_actions[:, t]
+                        actions_populated = torch.all(actions_for_curr_step != 0, axis=1)
+                        actions_for_curr_step = actions_for_curr_step[actions_populated]
+                        k = 0.01
+                        exp_weights = np.exp(-k * np.arange(len(actions_for_curr_step)))
+                        exp_weights = exp_weights / exp_weights.sum()
+                        exp_weights = torch.from_numpy(exp_weights).cuda().unsqueeze(dim=1)
+                        raw_action = (actions_for_curr_step * exp_weights).sum(dim=0, keepdim=True)
+                    else:
+                        raw_action = all_actions[:, t % query_frequency]
+                elif config['policy_class'] == "CNNMLP":
+                    raw_action = policy(qpos, curr_image)
+                else:
+                    raise NotImplementedError
 
-#                 ### for visualization
-#                 qpos_list.append(qpos_numpy)
-#                 target_qpos_list.append(target_qpos)
+                ### post-process actions
+                raw_action = raw_action.squeeze(0).cpu().numpy()
+                action = post_process(raw_action)
+                target_qpos = action
+
+                ### Move the Robot
+                action[3:6] = quat2axisangle(mat2quat(euler2mat(action[3:6])))  # convert euler to axis-angle
+                # action = normalize_gripper_action(action, binarize=True)  # normalize gripper action
+                print(action)
+
+                robot_interface.control(
+                    controller_type='OSC_POSE',
+                    action=action[:6],
+                    controller_cfg=DEFAULT_CONTROLLER,
+                )
+                robot_interface.gripper_control(action[-1])
+
+
+                # Display the image Press 'q' to exit
+                cv2.imshow("Camera", cv2.cvtColor(color_frame, cv2.COLOR_RGB2BGR))  # convert back to BGR for cv2
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+
+
+                ### for visualization
+                qpos_list.append(qpos_numpy)
+                target_qpos_list.append(target_qpos)
 #                 rewards.append(ts.reward)
 
 #             plt.close()
-#         if real_robot:
-#             move_grippers([env.puppet_bot_left, env.puppet_bot_right], [PUPPET_GRIPPER_JOINT_OPEN] * 2, move_time=0.5)  # open
-#             pass
+        # if real_robot:
+        #     move_grippers([env.puppet_bot_left, env.puppet_bot_right], [PUPPET_GRIPPER_JOINT_OPEN] * 2, move_time=0.5)  # open
+        #     pass
 
 #         rewards = np.array(rewards)
 #         episode_return = np.sum(rewards[rewards!=None])
@@ -308,8 +386,8 @@ def get_image(ts, camera_names):
 #         highest_rewards.append(episode_highest_reward)
 #         print(f'Rollout {rollout_id}\n{episode_return=}, {episode_highest_reward=}, {env_max_reward=}, Success: {episode_highest_reward==env_max_reward}')
 
-#         if save_episode:
-#             save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
+        # if save_episode:
+        #     save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
 
 #     success_rate = np.mean(np.array(highest_rewards) == env_max_reward)
 #     avg_return = np.mean(episode_returns)
@@ -398,11 +476,11 @@ def train_bc(train_dataloader, val_dataloader, config):
         epoch_train_loss = epoch_summary['loss']
         print(f'Train loss: {epoch_train_loss:.5f}')
         summary_string = ''
-        if epoch % 10 == 0:
+        if epoch % 10 == 0 and config['log_wandb']:
             wandb.log({'epoch': epoch})
         for k, v in epoch_summary.items():
             summary_string += f'{k}: {v.item():.3f} '
-            if epoch % 10 == 0:
+            if epoch % 10 == 0 and config['log_wandb']:
                 wandb.log({f'train_{k}': v.item()})
         print(summary_string)
 
@@ -445,7 +523,7 @@ def plot_history(train_history, validation_history, num_epochs, ckpt_dir, seed):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--onscreen_render', action='store_true')
+    # parser.add_argument('--onscreen_render', action='store_true')
     parser.add_argument('--ckpt_dir', action='store', type=str, help='ckpt_dir', required=True)
     parser.add_argument('--policy_class', action='store', type=str, help='policy_class, capitalize', required=True)
     parser.add_argument('--task_name', action='store', type=str, help='task_name', required=True)
@@ -454,6 +532,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', action='store', type=int, help='num_epochs', required=True)
     parser.add_argument('--lr', action='store', type=float, help='lr', required=True)
     parser.add_argument('--run_name', action='store', type=str, help='run_name', required=True)
+    parser.add_argument('--no_wandb', action='store_true', required=False)
+    parser.add_argument('--ckpt_name', action='store', type=str, help='checkpoint name, used only for eval')
 
     # for ACT
     parser.add_argument('--kl_weight', action='store', type=int, help='KL Weight', required=False)

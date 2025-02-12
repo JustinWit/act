@@ -66,6 +66,8 @@ def get_args_parser():
     parser.add_argument('--run_name', action='store', type=str, help='run_name', required=True)
     parser.add_argument('--no_proprioception', action='store_true')
     parser.add_argument('--preload_data', action='store_true')
+    parser.add_argument('--no_wandb', action='store_true', required=False)
+    parser.add_argument('--ckpt_name', action='store', type=str, help='checkpoint name, used only for eval')
     return parser
 
 

@@ -1,4 +1,5 @@
 import pathlib
+from easydict import EasyDict
 
 ### Task parameters
 DATA_DIR = 'datasets'
@@ -37,13 +38,25 @@ TASK_CONFIGS = {
     'real_pick_coke':{
         'dataset_dir': DATA_DIR + '/real_pick_coke',
         'num_episodes': 40,
-        'episode_len': 152,  # TODO where is this used?
+        'episode_len': 152,
         'camera_names': ['rgb_frames']
     },
     'real_pick_coke_half':{
         'dataset_dir': DATA_DIR + '/real_pick_coke_half',
         'num_episodes': 20,
-        'episode_len': 152,  # TODO where is this used?
+        'episode_len': 152,
+        'camera_names': ['rgb_frames']
+    },
+        'sim_pick_coke_500':{
+        'dataset_dir': DATA_DIR + '/sim_pick_coke_500',
+        'num_episodes': 500,
+        'episode_len': 22,
+        'camera_names': ['rgb_frames']
+    },
+    'sim_pick_coke_500_domain_rand':{
+        'dataset_dir': DATA_DIR + '/sim_pick_coke_500_domain_rand',
+        'num_episodes': 500,
+        'episode_len': 23,
         'camera_names': ['rgb_frames']
     },
 }
@@ -90,3 +103,30 @@ PUPPET_POS2JOINT = lambda x: PUPPET_GRIPPER_POSITION_NORMALIZE_FN(x) * (PUPPET_G
 PUPPET_JOINT2POS = lambda x: PUPPET_GRIPPER_POSITION_UNNORMALIZE_FN((x - PUPPET_GRIPPER_JOINT_CLOSE) / (PUPPET_GRIPPER_JOINT_OPEN - PUPPET_GRIPPER_JOINT_CLOSE))
 
 MASTER_GRIPPER_JOINT_MID = (MASTER_GRIPPER_JOINT_OPEN + MASTER_GRIPPER_JOINT_CLOSE)/2
+
+# Default controller parameters
+DEFAULT_CONTROLLER = EasyDict({
+    'controller_type': 'OSC_POSE',
+    'is_delta': True,
+    'traj_interpolator_cfg': {
+        'traj_interpolator_type': 'LINEAR_POSE',
+        'time_fraction': 0.3
+    },
+    'Kp': {
+        'translation': [250.0, 250.0, 250.0],
+        'rotation': [250.0, 250.0, 250.0]
+    },
+    'action_scale': {
+        'translation': 1.0,
+        'rotation': 1.0
+    },
+    'residual_mass_vec': [0.0, 0.0, 0.0, 0.0, 0.1, 0.5, 0.5],
+    'state_estimator_cfg': {
+        'is_estimation': False,
+        'state_estimator_type': 'EXPONENTIAL_SMOOTHING',
+        'alpha_q': 0.9,
+        'alpha_dq': 0.9,
+        'alpha_eef': 1.0,
+        'alpha_eef_vel': 1.0
+    }
+})
