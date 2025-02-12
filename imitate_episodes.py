@@ -307,15 +307,12 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 assert color_frame.shape == (360, 640, 3)
                 color_frame = color_frame[:, 140:500]  # center crop 360x360
                 color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
-                color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB TODO double check this
-                plt.imsave(f'img.png', color_frame)
-                breakpoint()
+                color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB
                 image_list.append(color_frame)
 
                 if proprioception:
                     qpos = robot_interface.last_eef_quat_and_pos
                     qpos_numpy = np.concatenate([qpos[1].flatten(), qpos[0]])
-                    breakpoint() # TODO make sure this is correct
                     qpos = pre_process(qpos_numpy)
                 else:
                     qpos = np.zeros(7)

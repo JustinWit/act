@@ -2,7 +2,9 @@ import os
 import pickle as pkl
 from tqdm import tqdm
 
-pkl_dir = "/data3/act_data/real_pick_coke_half"
+import matplotlib.pyplot as plt
+
+pkl_dir = "/data3/act_data/sim_pick_coke_500_domain_rand"
 max_demo_len = 0
 for i in tqdm(range(20)):
     # format like 000, 001, 002, etc
@@ -11,5 +13,8 @@ for i in tqdm(range(20)):
         data = pkl.load(f)
     demo_len = data['arm_action'].shape[0]
     max_demo_len = max(max_demo_len, demo_len)
+
+    # plt.imshow(data['rgb_frames'][0][0])
+    # plt.show()
 
 print(max_demo_len)
