@@ -34,7 +34,7 @@ def main(args):
     # onscreen_render = args['onscreen_render']
     task_name = args['task_name']
     batch_size_train = args['batch_size']
-    # batch_size_val = args['batch_size']
+    batch_size_val = args['batch_size']
     num_epochs = args['num_epochs']
     log_wandb = not args['no_wandb']
 
@@ -89,7 +89,7 @@ def main(args):
         'seed': args['seed'],
         'temporal_agg': args['temporal_agg'],
         'camera_names': camera_names,
-        'real_robot': not is_sim,
+        # 'real_robot': not is_sim,
         'log_wandb': log_wandb,
         'batch_size': batch_size_train,
     }
@@ -189,7 +189,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     set_seed(1000)
     ckpt_dir = config['ckpt_dir']
     state_dim = config['state_dim']
-    real_robot = config['real_robot']
+    # real_robot = config['real_robot']
     policy_class = config['policy_class']
     # onscreen_render = config['onscreen_render']
     policy_config = config['policy_config']

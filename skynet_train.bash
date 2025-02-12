@@ -12,4 +12,4 @@ nvidia-smi
 USER=$(whoami)
 source /coc/testnvme/$USER/.bashrc
 conda activate aloha
-bash train.bash $1
+bash train.bash $1 $2

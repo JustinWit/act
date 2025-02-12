@@ -6,6 +6,7 @@ import pickle as pkl
 from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 from PIL import Image
+from tqdm import tqdm
 
 import IPython
 e = IPython.embed
@@ -124,7 +125,7 @@ def get_norm_stats(
     all_qpos_data = []
     all_action_data = []
     all_demos = []
-    for i, episode_path in enumerate(os.listdir(dataset_dir)):
+    for i, episode_path in enumerate(tqdm(os.listdir(dataset_dir), desc='Loading data')):
         # dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
         with open(os.path.join(dataset_dir, episode_path), 'rb') as dbfile:
             root = pkl.load(dbfile)
