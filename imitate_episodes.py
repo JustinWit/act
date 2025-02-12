@@ -184,6 +184,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     from deoxys.experimental.motion_utils import reset_joints_to
     from deoxys.utils.transform_utils import quat2axisangle, mat2quat, euler2mat
     import cv2
+    from record_eval import RecordEval
 
     # ACT variables
     set_seed(1000)
@@ -221,6 +222,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
             port = "10007",  # 5 - top, 6 - side, 7 - front
             topic_type = 'RGB'
         )
+    video_recorder = RecordEval()
 
     # Initialize robot
     robot_interface = FrankaInterface(
@@ -285,10 +287,12 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
             all_time_actions = torch.zeros([max_timesteps, max_timesteps+num_queries, state_dim]).cuda()
 
         qpos_history = torch.zeros((1, max_timesteps, state_dim)).cuda()
-        image_list = [] # for visualization
-        qpos_list = []
-        target_qpos_list = []
-#         rewards = []
+        # image_list = [] # for visualization
+        video_recorder = RecordEval()
+        video_recorder.start()
+        # qpos_list = []
+        # target_qpos_list = []
+        # rewards = []
         with torch.inference_mode():
             for t in range(max_timesteps):
 #                 ### update onscreen render and wait for DT
@@ -308,7 +312,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 color_frame = color_frame[:, 140:500]  # center crop 360x360
                 color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
                 color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB
-                image_list.append(color_frame)
+                # image_list.append(color_frame)
 
                 if proprioception:
                     qpos = robot_interface.last_eef_quat_and_pos
@@ -368,9 +372,11 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
 
                 ### for visualization
-                qpos_list.append(qpos_numpy)
-                target_qpos_list.append(target_qpos)
-#                 rewards.append(ts.reward)
+                # qpos_list.append(qpos_numpy)
+                # target_qpos_list.append(target_qpos)
+                # rewards.append(ts.reward)
+
+        video_recorder.stop(os.path.join(ckpt_dir, 'videos'))
 
 #             plt.close()
         # if real_robot:
@@ -385,8 +391,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 #         print(f'Rollout {rollout_id}\n{episode_return=}, {episode_highest_reward=}, {env_max_reward=}, Success: {episode_highest_reward==env_max_reward}')
 
         # if save_episode:
-        #     save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
-
+            # save_videos(image_list, DT, video_path=os.path.join(ckpt_dir, f'video{rollout_id}.mp4'))
 #     success_rate = np.mean(np.array(highest_rewards) == env_max_reward)
 #     avg_return = np.mean(episode_returns)
 #     summary_str = f'\nSuccess rate: {success_rate}\nAverage return: {avg_return}\n\n'
