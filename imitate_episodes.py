@@ -480,14 +480,16 @@ def train_bc(train_dataloader, val_dataloader, config):
         print(f'Train loss: {epoch_train_loss:.5f}')
         summary_string = ''
         if epoch % 10 == 0 and config['log_wandb']:
-            wandb.log({'epoch': epoch})
+            wandb_log_dict = {'epoch': epoch}
         for k, v in epoch_summary.items():
             summary_string += f'{k}: {v.item():.3f} '
             if epoch % 10 == 0 and config['log_wandb']:
-                wandb.log({f'train_{k}': v.item()})
+                wandb_log_dict.update({f'train_{k}': v.item()})
+        if epoch % 10 == 0 and config['log_wandb']:
+            wandb.log(wandb_log_dict)
         print(summary_string)
 
-        if epoch % 100 == 0:
+        if epoch % 1000 == 0:
             ckpt_path = os.path.join(ckpt_dir, f'policy_epoch_{epoch}_seed_{seed}.ckpt')
             torch.save(policy.state_dict(), ckpt_path)
             plot_history(train_history, validation_history, epoch, ckpt_dir, seed)
