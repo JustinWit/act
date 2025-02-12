@@ -34,7 +34,7 @@ def main(args):
     # onscreen_render = args['onscreen_render']
     task_name = args['task_name']
     batch_size_train = args['batch_size']
-    batch_size_val = args['batch_size']
+    # batch_size_val = args['batch_size']
     num_epochs = args['num_epochs']
     log_wandb = not args['no_wandb']
 
@@ -91,6 +91,7 @@ def main(args):
         'camera_names': camera_names,
         'real_robot': not is_sim,
         'log_wandb': log_wandb,
+        'batch_size': batch_size_train,
     }
 
     if is_eval:
@@ -492,10 +493,10 @@ def train_bc(train_dataloader, val_dataloader, config):
     ckpt_path = os.path.join(ckpt_dir, f'policy_last.ckpt')
     torch.save(policy.state_dict(), ckpt_path)
 
-    best_epoch, min_val_loss, best_state_dict = best_ckpt_info
-    ckpt_path = os.path.join(ckpt_dir, f'policy_epoch_{best_epoch}_seed_{seed}.ckpt')
-    torch.save(best_state_dict, ckpt_path)
-    print(f'Training finished:\nSeed {seed}, val loss {min_val_loss:.6f} at epoch {best_epoch}')
+    # best_epoch, min_val_loss, best_state_dict = best_ckpt_info
+    # ckpt_path = os.path.join(ckpt_dir, f'policy_epoch_{best_epoch}_seed_{seed}.ckpt')
+    # torch.save(best_state_dict, ckpt_path)
+    # print(f'Training finished:\nSeed {seed}, val loss {min_val_loss:.6f} at epoch {best_epoch}')
 
     # save training curves
     plot_history(train_history, validation_history, num_epochs, ckpt_dir, seed)
