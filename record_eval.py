@@ -5,15 +5,15 @@ from time import sleep
 import datetime
 import os
 
-class RecordEval:
+class RecordEval():
     def __init__(self):
         self.image_list = []
         self.record = False
         self.image_subscriber = ZMQCameraSubscriber(
-                host = "143.215.128.151",
-                port = "10007",  # 5 - top, 6 - side, 7 - front
-                topic_type = 'RGB'
-            )
+                                    host = "143.215.128.151",
+                                    port = "10007",  # 5 - top, 6 - side, 7 - front
+                                    topic_type = 'RGB'
+                                )
         self.record_thread = threading.Thread(target=self.save_frames)
 
     def save_frames(self):
@@ -34,6 +34,7 @@ class RecordEval:
 
     def stop(self, root_path):
         self.record = False
+        self.record_thread.join()
         if not os.path.exists(root_path):
             os.makedirs(root_path)
         filename = f'{datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.mp4'

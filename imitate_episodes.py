@@ -222,7 +222,6 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
             port = "10007",  # 5 - top, 6 - side, 7 - front
             topic_type = 'RGB'
         )
-    video_recorder = RecordEval()
 
     # Initialize robot
     robot_interface = FrankaInterface(
