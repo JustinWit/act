@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 
-pkl_dir = "datasets/sim_pick_coke_translated"
+pkl_dir = "datasets/sim_pick_coke_big_rand"
 max_demo_len = 0
 for i in tqdm(range(500)):
     # format like 000, 001, 002, etc

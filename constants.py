@@ -65,6 +65,18 @@ TASK_CONFIGS = {
         'episode_len': 21,
         'camera_names': ['rgb_frames']
     },
+    'sim_pick_coke_big_rand_translated':{
+        'dataset_dir': DATA_DIR + '/sim_pick_coke_big_rand_translated',
+        'num_episodes': 500,
+        'episode_len': 23,
+        'camera_names': ['rgb_frames']
+    },
+    'sim_pick_coke_big_rand':{
+        'dataset_dir': DATA_DIR + '/sim_pick_coke_big_rand',
+        'num_episodes': 500,
+        'episode_len': 23,
+        'camera_names': ['rgb_frames']
+    },
 }
 
 ### Simulation envs fixed constants
