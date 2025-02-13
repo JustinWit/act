@@ -287,7 +287,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
         qpos_history = torch.zeros((1, max_timesteps, state_dim)).cuda()
         # image_list = [] # for visualization
-        video_recorder = RecordEval()
+        video_recorder = RecordEval(ckpt_name)
         video_recorder.start()
         # qpos_list = []
         # target_qpos_list = []
@@ -307,7 +307,8 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                     continue
 
                 # process and store image
-                assert color_frame.shape == (360, 640, 3)
+                if color_frame.shape != (360, 640, 3):
+                    color_frame = cv2.resize(color_frame, (640, 360))
                 color_frame = color_frame[:, 140:500]  # center crop 360x360
                 color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
                 color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB
