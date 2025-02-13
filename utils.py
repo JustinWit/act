@@ -49,9 +49,11 @@ class EpisodicDataset(torch.utils.data.Dataset):
             start_ts = np.random.choice(episode_len)
         # get observation at start_ts only
         if self.use_proprio:
-            qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))[start_ts]
+            if np.isclose(root['gripper_action'].max(), 0.04, atol=1e-2):
+                root['gripper_action'] = root['gripper_action'] * 2
+            qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat'], root['gripper_action'][:, None]))[start_ts]
         else:
-            qpos = np.zeros(7)
+            qpos = np.zeros(8)
         # qvel = root['/observations/qvel'][start_ts]
         # image_dict = dict()
         for cam_name in self.camera_names:
@@ -134,7 +136,10 @@ def get_norm_stats(
             all_demos.append(root)
         # get action and pose data
         # qpos = root['/observations/qpos'][()]
-        qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))
+        if np.isclose(root['gripper_action'].max(), 0.04, atol=1e-2):
+            root['gripper_action'] = root['gripper_action'] * 2
+        print(root['gripper_action'][:, None].shape)
+        qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat'], root['gripper_state'][:, None]))
         # qvel = root['/observations/qvel'][()]
         action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
         all_qpos_data.append(torch.from_numpy(qpos))

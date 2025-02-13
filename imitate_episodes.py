@@ -51,7 +51,7 @@ def main(args):
     camera_names = task_config['camera_names']
 
     # fixed parameters
-    state_dim = 7
+    state_dim = 8
     lr_backbone = 1e-5
     backbone = 'resnet18'
     if policy_class.upper() == 'ACT':
@@ -319,8 +319,8 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                     qpos_numpy = np.concatenate([qpos[1].flatten(), qpos[0]])
                     qpos = pre_process(qpos_numpy)
                 else:
-                    qpos = np.zeros(7)
-                    qpos_numpy = np.zeros(7)
+                    qpos = np.zeros(8)
+                    qpos_numpy = np.zeros(8)
                 qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
                 qpos_history[:, t] = qpos
                 curr_image = torch.from_numpy(color_frame / 255.).unsqueeze(0).float().cuda()

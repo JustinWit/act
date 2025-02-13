@@ -9,4 +9,4 @@ python imitate_episodes.py \
 --seed 0 \
 --run_name $2 \
 --preload_data \
---no_proprioception \
+--no_wandb \
