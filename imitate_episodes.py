@@ -260,7 +260,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    max_timesteps = int(max_timesteps * 2) # may increase for real-world tasks
+    max_timesteps = int(152) # may increase for real-world tasks
 
     num_rollouts = 1
 #     episode_returns = []
@@ -355,6 +355,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 ### Move the Robot
                 action[3:6] = quat2axisangle(mat2quat(euler2mat(action[3:6])))  # convert euler to axis-angle
                 # action = normalize_gripper_action(action, binarize=True)  # normalize gripper action
+                action[-1] = 1 if action[-1] > 0 else -1  # binarize gripper action
                 print(action)
 
                 robot_interface.control(
