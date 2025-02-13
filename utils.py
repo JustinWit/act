@@ -125,7 +125,8 @@ def get_norm_stats(
     all_qpos_data = []
     all_action_data = []
     all_demos = []
-    for i, episode_path in enumerate(tqdm(os.listdir(dataset_dir), desc='Loading data')):
+    listdir = [x for x in os.listdir(dataset_dir) if x.endswith('.pkl')]
+    for i, episode_path in enumerate(tqdm(listdir, desc='Loading data')):
         # dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
         with open(os.path.join(dataset_dir, episode_path), 'rb') as dbfile:
             root = pkl.load(dbfile)
