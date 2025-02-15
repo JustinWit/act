@@ -10,3 +10,4 @@ python imitate_episodes.py \
 --run_name $2 \
 --preload_data \
 --no_wandb \
+--no_proprioception \

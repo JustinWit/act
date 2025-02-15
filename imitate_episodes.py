@@ -51,7 +51,7 @@ def main(args):
     camera_names = task_config['camera_names']
 
     # fixed parameters
-    state_dim = 8
+    state_dim = 7
     lr_backbone = 1e-5
     backbone = 'resnet18'
     if policy_class.upper() == 'ACT':
@@ -316,11 +316,12 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
                 if proprioception:
                     qpos = robot_interface.last_eef_quat_and_pos
-                    qpos_numpy = np.concatenate([qpos[1].flatten(), qpos[0]])
+                    gripper = robot_interface.last_gripper_q
+                    qpos_numpy = np.concatenate([qpos[1].flatten(), quat2axisangle(qpos[0]), [gripper]])
                     qpos = pre_process(qpos_numpy)
                 else:
-                    qpos = np.zeros(8)
-                    qpos_numpy = np.zeros(8)
+                    qpos = np.zeros(7)
+                    qpos_numpy = np.zeros(7)
                 qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
                 qpos_history[:, t] = qpos
                 curr_image = torch.from_numpy(color_frame / 255.).unsqueeze(0).float().cuda()
@@ -353,7 +354,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 target_qpos = action
 
                 ### Move the Robot
-                action[3:6] = quat2axisangle(mat2quat(euler2mat(action[3:6])))  # convert euler to axis-angle
+                # action[3:6] = quat2axisangle(mat2quat(euler2mat(action[3:6])))  # convert euler to axis-angle
                 # action = normalize_gripper_action(action, binarize=True)  # normalize gripper action
                 action[-1] = 1 if action[-1] > 0 else -1  # binarize gripper action
                 print(action)

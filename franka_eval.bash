@@ -12,6 +12,6 @@ python imitate_episodes.py \
 --ckpt_name $3 \
 --preload_data \
 --run_name eval \
---no_proprioception \
+# --no_proprioception \
 
 # --temporal_agg \
