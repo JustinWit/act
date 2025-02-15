@@ -307,8 +307,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                     continue
 
                 # process and store image
-                if color_frame.shape != (360, 640, 3):
-                    color_frame = cv2.resize(color_frame, (640, 360))
+                assert color_frame.shape == (360, 640, 3)
                 color_frame = color_frame[:, 140:500]  # center crop 360x360
                 color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
                 color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB
@@ -353,7 +352,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 target_qpos = action
 
                 ### Move the Robot
-                action[3:6] = quat2axisangle(mat2quat(euler2mat(action[3:6])))  # convert euler to axis-angle
+                # action[3:6] = quat2axisangle(mat2quat(euler2mat(action[3:6])))  # convert euler to axis-angle
                 # action = normalize_gripper_action(action, binarize=True)  # normalize gripper action
                 action[-1] = 1 if action[-1] > 0 else -1  # binarize gripper action
                 print(action)
