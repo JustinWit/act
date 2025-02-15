@@ -5,8 +5,9 @@ import h5py
 import pickle as pkl
 from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
-from PIL import Image
 from tqdm import tqdm
+import cv2
+from deoxys.utils.transform_utils import quat2axisangle
 
 import IPython
 e = IPython.embed
@@ -51,9 +52,12 @@ class EpisodicDataset(torch.utils.data.Dataset):
         if self.use_proprio:
             if np.isclose(root['gripper_action'].max(), 0.04, atol=1e-2):
                 root['gripper_action'] = root['gripper_action'] * 2
-            qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat'], root['gripper_action'][:, None]))[start_ts]
+            pos = root['eef_pos'].squeeze()[start_ts]
+            axis_angle = quat2axisangle(root['eef_quat'][start_ts])
+            gripper = root['gripper_action'][:, None][start_ts]
+            qpos = np.concatenate((pos, axis_angle, gripper))
         else:
-            qpos = np.zeros(8)
+            qpos = np.zeros(7)
         # qvel = root['/observations/qvel'][start_ts]
         # image_dict = dict()
         for cam_name in self.camera_names:
@@ -71,7 +75,8 @@ class EpisodicDataset(torch.utils.data.Dataset):
                 # center crop to 360 x 360
                 cam_image = cam_image[:, 140: 500]
                 # downsize to 256 x 256
-                cam_image = np.array(Image.fromarray(cam_image).resize((256, 256)))
+                cam_image = cv2.resize(cam_image, (256, 256))
+                # cam_image = np.array(Image.fromarray(cam_image).resize((256, 256)))
             else:
                 assert cam_image.shape == (256, 256, 3)
             cam_image = cam_image[None, :]
@@ -139,7 +144,9 @@ def get_norm_stats(
         if np.isclose(root['gripper_action'].max(), 0.04, atol=1e-2):
             root['gripper_action'] = root['gripper_action'] * 2
         print(root['gripper_action'][:, None].shape)
-        qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat'], root['gripper_state'][:, None]))
+        # check quat to axisangle
+        axis_angle = np.concatenate([[quat2axisangle(i)] for i in root['eef_quat']])
+        qpos = np.hstack((root['eef_pos'].squeeze(), axis_angle, root['gripper_state'][:, None]))
         # qvel = root['/observations/qvel'][()]
         action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
         all_qpos_data.append(torch.from_numpy(qpos))
@@ -159,7 +166,6 @@ def get_norm_stats(
     qpos_mean = all_qpos_data.mean(dim=[0], keepdim=True)
     qpos_std = all_qpos_data.std(dim=[0], keepdim=True)
     qpos_std = torch.clip(qpos_std, 1e-2, np.inf) # clipping
-
     stats = {"action_mean": action_mean.numpy().squeeze(), "action_std": action_std.numpy().squeeze(),
              "qpos_mean": qpos_mean.numpy().squeeze(), "qpos_std": qpos_std.numpy().squeeze(),
              "example_qpos": qpos}
