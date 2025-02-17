@@ -5,8 +5,9 @@ import h5py
 import pickle as pkl
 from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
-from PIL import Image
 from tqdm import tqdm
+import cv2
+from scipy.spatial.transform import Rotation as R
 
 import IPython
 e = IPython.embed
@@ -49,7 +50,13 @@ class EpisodicDataset(torch.utils.data.Dataset):
             start_ts = np.random.choice(episode_len)
         # get observation at start_ts only
         if self.use_proprio:
-            qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))[start_ts]
+            # qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))[start_ts]
+            if np.isclose(root['gripper_state'].max(), 0.04, atol=1e-2):  # this means its a sim episode
+                root['gripper_state'] = root['gripper_state'] * 2
+            pos = root['eef_pos'].squeeze()[start_ts]
+            axis_angle = R.from_quat(root['eef_quat'][start_ts]).as_rotvec()
+            gripper = root['gripper_state'][:, None][start_ts]
+            qpos = np.concatenate((pos, axis_angle, gripper))
         else:
             qpos = np.zeros(7)
         # qvel = root['/observations/qvel'][start_ts]
@@ -69,7 +76,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
                 # center crop to 360 x 360
                 cam_image = cam_image[:, 140: 500]
                 # downsize to 256 x 256
-                cam_image = np.array(Image.fromarray(cam_image).resize((256, 256)))
+                cam_image = cv2.resize(cam_image, (256, 256))
             else:
                 assert cam_image.shape == (256, 256, 3)
             cam_image = cam_image[None, :]
@@ -134,9 +141,15 @@ def get_norm_stats(
             all_demos.append(root)
         # get action and pose data
         # qpos = root['/observations/qpos'][()]
-        qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))
+        # qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))
+        if np.isclose(root['gripper_state'].max(), 0.04, atol=1e-2):
+            root['gripper_state'] = root['gripper_state'] * 2
+        # print(root['gripper_state'][:, None].shape)
+        # check quat to axisangle
+        axis_angle = np.concatenate([[R.from_quat(i).as_rotvec()] for i in root['eef_quat']])
+        qpos = np.hstack((root['eef_pos'].squeeze(), axis_angle, root['gripper_state'][:, None]))
         # qvel = root['/observations/qvel'][()]
-        action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
+        action = np.hstack((root['arm_action'], root['gripper_state'][:, None]))
         all_qpos_data.append(torch.from_numpy(qpos))
         all_action_data.append(torch.from_numpy(action))
 

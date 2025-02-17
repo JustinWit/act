@@ -37,7 +37,7 @@ SIM_TASK_CONFIGS = {
 TASK_CONFIGS = {
     'real_pick_coke':{
         'dataset_dir': DATA_DIR + '/real_pick_coke',
-        'num_episodes': 40,
+        'num_episodes': 50,
         'episode_len': 152,
         'camera_names': ['rgb_frames']
     },
