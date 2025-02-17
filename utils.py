@@ -27,6 +27,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
         super(EpisodicDataset).__init__()
         self.episode_ids = episode_ids
         self.dataset_dir = dataset_dir
+        self.preload_to_gpu = preload_to_gpu
         self.camera_names = camera_names
         self.norm_stats = norm_stats
         # convert to tensor and move to gpu
@@ -46,6 +47,23 @@ class EpisodicDataset(torch.utils.data.Dataset):
         return len(self.episode_ids)
 
     def __getitem__(self, index):
+        """
+        OpenVLA image augs
+            rlds_config["frame_transform_kwargs"].update({"image_augment_kwargs" : dict(
+                random_resized_crop=dict(scale=[0.9, 0.9], ratio=[1.0, 1.0]),
+                random_brightness=[0.2],
+                random_contrast=[0.8, 1.2],
+                random_saturation=[0.8, 1.2],
+                random_hue=[0.05],
+                augment_order=[
+                    "random_resized_crop",
+                    "random_brightness",
+                    "random_contrast",
+                    "random_saturation",
+                    "random_hue",
+                ],
+            )}),
+        """
         sample_full_episode = False # hardcode
         data = self.all_demos[index]
 
@@ -65,7 +83,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
 
         padded_action = torch.zeros_like(data['action'])
         padded_action[:action_len] = action
-        is_pad = torch.zeros(episode_len, device='cuda', dtype=torch.bool)
+        is_pad = torch.zeros(episode_len, device='cuda' if self.preload_to_gpu else "cpu", dtype=torch.bool)
         is_pad[action_len:] = 1
 
         padded_action = (padded_action - self.norm_stats["action_mean"]) / self.norm_stats["action_std"]
@@ -73,7 +91,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
         # added this since the actions just get truncated by the model anyways
         padded_action = padded_action[:self.chunk_size]
         is_pad = is_pad[:self.chunk_size]
-        return cam_image.cuda(), qpos.cuda(), padded_action.cuda(), is_pad.cuda()
+        return cam_image, qpos, padded_action, is_pad
 
 
 def get_norm_stats(

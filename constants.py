@@ -34,50 +34,50 @@ SIM_TASK_CONFIGS = {
 }
 
 
-TASK_CONFIGS = {
-    'real_pick_coke':{
-        'dataset_dir': DATA_DIR + '/real_pick_coke',
-        'num_episodes': 50,
-        'episode_len': 152,
-        'camera_names': ['rgb_frames']
-    },
-    'real_pick_coke_half':{
-        'dataset_dir': DATA_DIR + '/real_pick_coke_half',
-        'num_episodes': 20,
-        'episode_len': 152,
-        'camera_names': ['rgb_frames']
-    },
-        'sim_pick_coke_500':{
-        'dataset_dir': DATA_DIR + '/sim_pick_coke_500',
-        'num_episodes': 500,
-        'episode_len': 22,
-        'camera_names': ['rgb_frames']
-    },
-    'sim_pick_coke_500_domain_rand':{
-        'dataset_dir': DATA_DIR + '/sim_pick_coke_500_domain_rand',
-        'num_episodes': 500,
-        'episode_len': 23,
-        'camera_names': ['rgb_frames']
-    },
-    'sim_pick_coke_translated':{
-        'dataset_dir': DATA_DIR + '/sim_pick_coke_translated',
-        'num_episodes': 500,
-        'episode_len': 21,
-        'camera_names': ['rgb_frames']
-    },
-    'sim_pick_coke_big_rand_translated':{
-        'dataset_dir': DATA_DIR + '/sim_pick_coke_big_rand_translated',
-        'num_episodes': 500,
-        'episode_len': 23,
-        'camera_names': ['rgb_frames']
-    },
-    'sim_pick_coke_big_rand':{
-        'dataset_dir': DATA_DIR + '/sim_pick_coke_big_rand',
-        'num_episodes': 500,
-        'episode_len': 23,
-        'camera_names': ['rgb_frames']
-    },
-}
+# TASK_CONFIGS = {
+#     'real_pick_coke':{
+#         'dataset_dir': DATA_DIR + '/real_pick_coke',
+#         'num_episodes': 50,
+#         'episode_len': 152,
+#         'camera_names': ['rgb_frames']
+#     },
+#     'real_pick_coke_half':{
+#         'dataset_dir': DATA_DIR + '/real_pick_coke_half',
+#         'num_episodes': 20,
+#         'episode_len': 152,
+#         'camera_names': ['rgb_frames']
+#     },
+#         'sim_pick_coke_500':{
+#         'dataset_dir': DATA_DIR + '/sim_pick_coke_500',
+#         'num_episodes': 500,
+#         'episode_len': 22,
+#         'camera_names': ['rgb_frames']
+#     },
+#     'sim_pick_coke_500_domain_rand':{
+#         'dataset_dir': DATA_DIR + '/sim_pick_coke_500_domain_rand',
+#         'num_episodes': 500,
+#         'episode_len': 23,
+#         'camera_names': ['rgb_frames']
+#     },
+#     'sim_pick_coke_translated':{
+#         'dataset_dir': DATA_DIR + '/sim_pick_coke_translated',
+#         'num_episodes': 500,
+#         'episode_len': 21,
+#         'camera_names': ['rgb_frames']
+#     },
+#     'sim_pick_coke_big_rand_translated':{
+#         'dataset_dir': DATA_DIR + '/sim_pick_coke_big_rand_translated',
+#         'num_episodes': 500,
+#         'episode_len': 23,
+#         'camera_names': ['rgb_frames']
+#     },
+#     'sim_pick_coke_big_rand':{
+#         'dataset_dir': DATA_DIR + '/sim_pick_coke_big_rand',
+#         'num_episodes': 500,
+#         'episode_len': 23,
+#         'camera_names': ['rgb_frames']
+#     },
+# }
 
 ### Simulation envs fixed constants
 DT = 0.02

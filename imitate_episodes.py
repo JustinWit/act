@@ -17,7 +17,7 @@ from policy import ACTPolicy, CNNMLPPolicy
 from visualize_episodes import save_videos
 
 from sim_env import BOX_POSE
-from constants import TASK_CONFIGS
+# from constants import TASK_CONFIGS
 
 import IPython
 e = IPython.embed
@@ -44,11 +44,11 @@ def main(args):
     #     from constants import SIM_TASK_CONFIGS
     #     task_config = SIM_TASK_CONFIGS[task_name]
     # else:
-    task_config = TASK_CONFIGS[task_name]
-    dataset_dir = task_config['dataset_dir']
-    num_episodes = task_config['num_episodes']
-    episode_len = task_config['episode_len']
-    camera_names = task_config['camera_names']
+    # task_config = TASK_CONFIGS[task_name]
+    dataset_dir = os.path.join("datasets", task_name)
+    num_episodes = len([x for x in os.listdir(dataset_dir) if x.endswith('.pkl')])
+    # episode_len = task_config['episode_len']
+    camera_names = ['rgb_frames']
 
     # fixed parameters
     state_dim = 7
@@ -79,7 +79,7 @@ def main(args):
     config = {
         'num_epochs': num_epochs,
         'ckpt_dir': ckpt_dir,
-        'episode_len': episode_len,
+        # 'episode_len': episode_len,
         'state_dim': state_dim,
         'lr': args['lr'],
         'policy_class': policy_class,
@@ -196,7 +196,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     # onscreen_render = config['onscreen_render']
     policy_config = config['policy_config']
     camera_names = config['camera_names']
-    max_timesteps = config['episode_len']
+    # max_timesteps = config['episode_len']
     task_name = config['task_name']
     temporal_agg = config['temporal_agg']
     # onscreen_cam = 'angle'
