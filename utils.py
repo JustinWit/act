@@ -12,13 +12,29 @@ from scipy.spatial.transform import Rotation as R
 import IPython
 e = IPython.embed
 
+
 class EpisodicDataset(torch.utils.data.Dataset):
-    def __init__(self, episode_ids, dataset_dir, camera_names, norm_stats, proprioception=True, chunk_size=None, all_demos=None):
+    def __init__(self,
+            episode_ids,
+            dataset_dir,
+            camera_names,
+            norm_stats,
+            proprioception=True,
+            chunk_size=None,
+            all_demos=None,
+            preload_to_gpu=False,
+            ):
         super(EpisodicDataset).__init__()
         self.episode_ids = episode_ids
         self.dataset_dir = dataset_dir
         self.camera_names = camera_names
         self.norm_stats = norm_stats
+        # convert to tensor and move to gpu
+        for k, v in self.norm_stats.items():
+            if isinstance(v, np.ndarray):
+                self.norm_stats[k] = torch.from_numpy(v).float()
+                if preload_to_gpu:
+                    self.norm_stats[k] = self.norm_stats[k].cuda()
         self.is_sim = None
         self.use_proprio = proprioception
         # self.__getitem__(0) # initialize self.is_sim
@@ -31,103 +47,40 @@ class EpisodicDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         sample_full_episode = False # hardcode
-        if self.all_demos is None:
-            # use f-string to format index to be three digits with leading zeros
-            episode_id = f'{self.episode_ids[index]:03d}'
-            dataset_path = os.path.join(self.dataset_dir, f'demo_{episode_id}.pkl')
-            with open(dataset_path, 'rb') as db:
-                root = pkl.load(db)
-        else:
-            root = self.all_demos[index]
+        data = self.all_demos[index]
 
-        # is_sim = root.attrs['sim']
-        action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
-        original_action_shape = action.shape
+        original_action_shape = data['action'].shape
         episode_len = original_action_shape[0]
+
         if sample_full_episode:
             start_ts = 0
         else:
             start_ts = np.random.choice(episode_len)
-        # get observation at start_ts only
-        if self.use_proprio:
-            # qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))[start_ts]
-            if np.isclose(root['gripper_state'].max(), 0.04, atol=1e-2):  # this means its a sim episode
-                root['gripper_state'] = root['gripper_state'] * 2
-            pos = root['eef_pos'].squeeze()[start_ts]
-            axis_angle = R.from_quat(root['eef_quat'][start_ts]).as_rotvec()
-            gripper = root['gripper_state'][:, None][start_ts]
-            qpos = np.concatenate((pos, axis_angle, gripper))
-        else:
-            qpos = np.zeros(7)
-        # qvel = root['/observations/qvel'][start_ts]
-        # image_dict = dict()
-        for cam_name in self.camera_names:
-            if root[cam_name].shape[1] == 3:  # real data has 3 cams
-                cam_image = root[cam_name][start_ts][2]
-                assert cam_image.shape == (360, 640, 3)
-            elif root[cam_name].shape[1] == 1:  # sim data has one cam
-                cam_image = root[cam_name][start_ts][0]
-                assert cam_image.shape == (256, 256, 3)
-            else:
-                raise ValueError('Unknown camera shape')
-            # convert bgr to rgb
-            cam_image = cam_image[..., ::-1]
-            if cam_image.shape == (360, 640, 3):
-                # center crop to 360 x 360
-                cam_image = cam_image[:, 140: 500]
-                # downsize to 256 x 256
-                cam_image = cv2.resize(cam_image, (256, 256))
-            else:
-                assert cam_image.shape == (256, 256, 3)
-            cam_image = cam_image[None, :]
-        # plt.imsave('img.png', cam_image[0])
 
         # get all actions after and including start_ts
         action_len = episode_len - start_ts
-        action = action[start_ts:]
-        # if is_sim:
-        #     action = root['/action'][start_ts:]
-        #     action_len = episode_len - start_ts
-        # else:
-        #     action = root['/action'][max(0, start_ts - 1):] # hack, to make timesteps more aligned
-        #     action_len = episode_len - max(0, start_ts - 1) # hack, to make timesteps more aligned
+        action = data['action'][start_ts:]
+        cam_image = data['camera'][start_ts: start_ts + 1]
+        qpos = data['qpos'][start_ts]
 
-        padded_action = np.zeros(original_action_shape, dtype=np.float32)
+        padded_action = torch.zeros_like(data['action'])
         padded_action[:action_len] = action
-        is_pad = np.zeros(episode_len)
+        is_pad = torch.zeros(episode_len, device='cuda', dtype=torch.bool)
         is_pad[action_len:] = 1
 
-        # new axis for different cameras NOTE: this is not necessary for our case we have single cam
-        # all_cam_images = []
-        # for cam_name in self.camera_names:
-        #     all_cam_images.append(cam_image)
-        # all_cam_images = np.stack(all_cam_images, axis=0)
-        # breakpoint()
-
-        # construct observations
-        image_data = torch.from_numpy(cam_image.copy())
-        qpos_data = torch.from_numpy(qpos).float()
-        action_data = torch.from_numpy(padded_action).float()
-        is_pad = torch.from_numpy(is_pad).bool()
-
-        # channel last -> channel first
-        image_data = torch.einsum('k h w c -> k c h w', image_data)
-
-        # normalize image and change dtype to float
-        image_data = image_data / 255.0
-        action_data = (action_data - self.norm_stats["action_mean"]) / self.norm_stats["action_std"]
-        qpos_data = (qpos_data - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]
+        padded_action = (padded_action - self.norm_stats["action_mean"]) / self.norm_stats["action_std"]
+        qpos = (qpos - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]
         # added this since the actions just get truncated by the model anyways
-        action_data = action_data[:self.chunk_size]
+        padded_action = padded_action[:self.chunk_size]
         is_pad = is_pad[:self.chunk_size]
-        return image_data.float(), qpos_data.float(), action_data.float(), is_pad
+        return cam_image.cuda(), qpos.cuda(), padded_action.cuda(), is_pad.cuda()
 
 
 def get_norm_stats(
     dataset_dir,
     num_episodes,
     proprioception=True,
-    preload_data=False,
+    preload_to_gpu=False,
     ):
     all_qpos_data = []
     all_action_data = []
@@ -137,25 +90,25 @@ def get_norm_stats(
         # dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
         with open(os.path.join(dataset_dir, episode_path), 'rb') as dbfile:
             root = pkl.load(dbfile)
-        if preload_data:
-            all_demos.append(root)
-        # get action and pose data
-        # qpos = root['/observations/qpos'][()]
-        # qpos = np.hstack((root['eef_pos'].squeeze(), root['eef_quat']))
-        if np.isclose(root['gripper_state'].max(), 0.04, atol=1e-2):
-            root['gripper_state'] = root['gripper_state'] * 2
-        # print(root['gripper_state'][:, None].shape)
-        # check quat to axisangle
-        axis_angle = np.concatenate([[R.from_quat(i).as_rotvec()] for i in root['eef_quat']])
-        qpos = np.hstack((root['eef_pos'].squeeze(), axis_angle, root['gripper_state'][:, None]))
-        # qvel = root['/observations/qvel'][()]
-        action = np.hstack((root['arm_action'], root['gripper_state'][:, None]))
+        qpos = get_proprioception(root)
+        if not proprioception:
+            qpos = np.zeros_like(qpos)
+        action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
         all_qpos_data.append(torch.from_numpy(qpos))
         all_action_data.append(torch.from_numpy(action))
+        # if preload_data:
+        all_demos.append({
+            "qpos": torch.from_numpy(qpos).float(),
+            "action": torch.from_numpy(action).float(),
+            "camera": preproc_imgs(root['rgb_frames']),
+        })
+        if preload_to_gpu:
+            for k, v in all_demos[-1].items():
+                all_demos[-1][k] = v.cuda().contiguous()
 
     all_qpos_data = torch.vstack(all_qpos_data)
-    if not proprioception:
-        all_qpos_data = torch.zeros_like(all_qpos_data)
+    # if not proprioception:
+    #     all_qpos_data = torch.zeros_like(all_qpos_data)
     all_action_data = torch.vstack(all_action_data)
 
     # normalize action data
@@ -170,9 +123,39 @@ def get_norm_stats(
 
     stats = {"action_mean": action_mean.numpy().squeeze(), "action_std": action_std.numpy().squeeze(),
              "qpos_mean": qpos_mean.numpy().squeeze(), "qpos_std": qpos_std.numpy().squeeze(),
-             "example_qpos": qpos}
+             "example_qpos": qpos, "use_proprioception": proprioception}
 
     return stats, all_demos
+
+
+def preproc_imgs(imgs):
+    if imgs.shape[1] == 3:  # real data has 3 cams
+        cam_image = imgs[:, 2]
+        assert cam_image.shape[1:] == (360, 640, 3)
+        cam_image = cam_image[:, 140: 500]
+        # downsize to 256 x 256
+        resized_imgs = []
+        for i in range(cam_image.shape[0]):
+            resized_imgs.append(cv2.resize(cam_image[i], (256, 256)))
+        cam_image = np.stack(resized_imgs, axis=0)
+    elif imgs.shape[1] == 1:  # sim data has one cam
+        cam_image = imgs[:, 0]
+        assert cam_image.shape[1:] == (256, 256, 3)
+    else:
+        raise ValueError('Unknown camera shape')
+    # convert bgr to rgb
+    cam_image = cam_image[..., ::-1]
+    cam_image = torch.from_numpy(cam_image.copy()).float() / 255.0
+    cam_image = torch.einsum('k h w c -> k c h w', cam_image)
+    return cam_image
+
+
+def get_proprioception(data):
+    if np.isclose(data['gripper_state'].max(), 0.04, atol=1e-2):
+        data['gripper_state'] *= 2
+    axis_angle = np.concatenate([[R.from_quat(i).as_rotvec()] for i in data['eef_quat']])
+    qpos = np.hstack((data['eef_pos'].squeeze(), axis_angle, data['gripper_state'][:, None]))
+    return qpos
 
 
 def collate_fn(batch):
@@ -195,7 +178,7 @@ def load_data(
     batch_size_val,
     proprioception=True,
     chunk_size=None,
-    preload_data=False,
+    preload_to_gpu=False,
     ):
 
     print(f'\nData from: {dataset_dir}\n')
@@ -210,7 +193,7 @@ def load_data(
         dataset_dir,
         num_episodes,
         proprioception=proprioception,
-        preload_data=preload_data,
+        preload_to_gpu=preload_to_gpu,
         )
 
     # construct dataset and dataloader
@@ -221,7 +204,8 @@ def load_data(
         norm_stats,
         proprioception=proprioception,
         chunk_size=chunk_size,
-        all_demos=all_demos if preload_data else None,
+        all_demos=all_demos,
+        preload_to_gpu=preload_to_gpu,
         )
     # val_dataset = EpisodicDataset(
     #     val_indices,
@@ -238,7 +222,7 @@ def load_data(
         train_dataset,
         batch_size=batch_size_train,
         shuffle=True,
-        pin_memory=True,
+        pin_memory=not preload_to_gpu,
         num_workers=n_workers,
         prefetch_factor=prefetch,
         collate_fn=collate_fn,

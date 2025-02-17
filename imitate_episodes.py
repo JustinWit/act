@@ -127,7 +127,7 @@ def main(args):
         batch_size_val,
         proprioception=not args['no_proprioception'],
         chunk_size=args['chunk_size'],
-        preload_data=args['preload_data'],
+        preload_to_gpu=args['preload_to_gpu'],
         )
 
     # save dataset stats
@@ -182,7 +182,8 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     from deoxys.franka_interface import FrankaInterface
     from deoxys.utils.config_utils import get_default_controller_config
     from deoxys.experimental.motion_utils import reset_joints_to
-    from deoxys.utils.transform_utils import quat2axisangle, mat2quat, euler2mat
+    # from deoxys.utils.transform_utils import quat2axisangle, mat2quat, euler2mat
+    from scipy.spatial.transform import Rotation as R
     import cv2
     from record_eval import RecordEval
 
@@ -211,6 +212,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
+        assert stats['use_proprioception'] == proprioception
 
     pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean']) / stats['qpos_std']
     post_process = lambda a: a * stats['action_std'] + stats['action_mean']
@@ -314,12 +316,15 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 # image_list.append(color_frame)
 
                 if proprioception:
-                    qpos = robot_interface.last_eef_quat_and_pos
-                    qpos_numpy = np.concatenate([qpos[1].flatten(), qpos[0]])
-                    qpos = pre_process(qpos_numpy)
+                    quat, pos = robot_interface.last_eef_quat_and_pos
+                    qpos = np.concatenate([
+                        pos.flatten(),
+                        R.from_quat(quat).as_rotvec(),
+                        robot_interface.last_gripper_q,
+                        ])
+                    qpos = pre_process(qpos)
                 else:
                     qpos = np.zeros(7)
-                    qpos_numpy = np.zeros(7)
                 qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
                 qpos_history[:, t] = qpos
                 curr_image = torch.from_numpy(color_frame / 255.).unsqueeze(0).float().cuda()
@@ -547,6 +552,6 @@ if __name__ == '__main__':
     parser.add_argument('--dim_feedforward', action='store', type=int, help='dim_feedforward', required=False)
     parser.add_argument('--temporal_agg', action='store_true')
     parser.add_argument('--no_proprioception', action='store_true')
-    parser.add_argument('--preload_data', action='store_true')
+    parser.add_argument('--preload_to_gpu', action='store_true')
 
     main(vars(parser.parse_args()))
