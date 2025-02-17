@@ -8,5 +8,5 @@ python imitate_episodes.py \
 --num_epochs 20000 --lr 1e-4 \
 --seed 0 \
 --run_name $2 \
---preload_data \
 --no_proprioception \
+--preload_to_gpu \
