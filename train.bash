@@ -9,5 +9,6 @@ python imitate_episodes.py \
 --seed 0 \
 --run_name $2 \
 --preload_to_gpu \
+--absolute_actions \
 # --gripper_proprio \
 # --no_proprioception \

@@ -93,6 +93,7 @@ def main(args):
         'log_wandb': log_wandb,
         'batch_size': batch_size_train,
         "gripper_proprio": args['gripper_proprio'],
+        'absolute_actions': args['absolute_actions'],
     }
 
     if is_eval:
@@ -135,6 +136,7 @@ def main(args):
         chunk_size=args['chunk_size'],
         preload_to_gpu=args['preload_to_gpu'],
         gripper_proprio=args['gripper_proprio'],
+        absolute_actions=args['absolute_actions'],
         )
 
     # save dataset stats
@@ -242,6 +244,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     )  # copied from playback_demo.py
 
     from constants import DEFAULT_CONTROLLER
+    DEFAULT_CONTROLLER['is_delta'] = not config['absolute_actions']
     # Golden resetting joints
     reset_joint_positions = [
             0.09162008114028396,
@@ -563,6 +566,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_proprioception', action='store_true')
     parser.add_argument('--preload_to_gpu', action='store_true')
     parser.add_argument('--gripper_proprio', action='store_true')
+    parser.add_argument('--absolute_actions', action='store_true')
     args = vars(parser.parse_args())
     if args['gripper_proprio']:
         assert not args['no_proprioception']

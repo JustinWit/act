@@ -7,7 +7,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import cv2
-from deoxys_transform_utils import quat2axisangle
+from deoxys_transform_utils import quat2axisangle, axisangle2quat, quat_multiply
 # from scipy.spatial.transform import Rotation as R
 
 import IPython
@@ -99,6 +99,7 @@ def get_norm_stats(
     proprioception=True,
     preload_to_gpu=False,
     gripper_proprio=False,
+    absolute_actions=False,
     ):
     all_qpos_data = []
     all_action_data = []
@@ -111,7 +112,7 @@ def get_norm_stats(
         qpos = get_proprioception(root, gripper_proprio=gripper_proprio)
         if not proprioception:
             qpos = np.zeros_like(qpos)
-        action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
+        action = get_action(root, absolute=absolute_actions)
         all_qpos_data.append(torch.from_numpy(qpos))
         all_action_data.append(torch.from_numpy(action))
         # if preload_data:
@@ -144,6 +145,21 @@ def get_norm_stats(
              "example_qpos": qpos, "use_proprioception": proprioception, 'use_gripper_proprio': gripper_proprio}
 
     return stats, all_demos
+
+
+def get_action(root, absolute=False):
+    if absolute:
+        pos = root['eef_pos'].squeeze() + root['arm_action'][:, :3]
+        quat_rot_actions = [axisangle2quat(x) for x in root['arm_action'][:, 3:]]
+        rot = np.array([
+            quat2axisangle(quat_multiply(i, j)) for i,j in \
+                zip(quat_rot_actions, root['eef_quat'])
+                ])
+        arm_action = np.hstack((pos, rot))
+    else:
+        arm_action = root['arm_action']
+    action = np.hstack((arm_action, root['gripper_action'][:, None]))
+    return action
 
 
 def preproc_imgs(imgs):
@@ -202,6 +218,7 @@ def load_data(
     chunk_size=None,
     preload_to_gpu=False,
     gripper_proprio=False,
+    absolute_actions=False,
     ):
 
     print(f'\nData from: {dataset_dir}\n')
@@ -218,6 +235,7 @@ def load_data(
         proprioception=proprioception,
         preload_to_gpu=preload_to_gpu,
         gripper_proprio=gripper_proprio,
+        absolute_actions=absolute_actions,
         )
 
     # construct dataset and dataloader
