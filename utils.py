@@ -89,7 +89,6 @@ class EpisodicDataset(torch.utils.data.Dataset):
         # added this since the actions just get truncated by the model anyways
         padded_action = padded_action[:self.chunk_size]
         is_pad = is_pad[:self.chunk_size]
-        breakpoint()
         return cam_image, qpos, padded_action, is_pad
 
 
