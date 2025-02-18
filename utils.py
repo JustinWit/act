@@ -140,9 +140,16 @@ def get_norm_stats(
     qpos_std = all_qpos_data.std(dim=[0], keepdim=True)
     qpos_std = torch.clip(qpos_std, 1e-2, np.inf) # clipping
 
-    stats = {"action_mean": action_mean.numpy().squeeze(), "action_std": action_std.numpy().squeeze(),
-             "qpos_mean": qpos_mean.numpy().squeeze(), "qpos_std": qpos_std.numpy().squeeze(),
-             "example_qpos": qpos, "use_proprioception": proprioception, 'use_gripper_proprio': gripper_proprio}
+    stats = {
+        "action_mean": action_mean.numpy().squeeze(),
+        "action_std": action_std.numpy().squeeze(),
+        "qpos_mean": qpos_mean.numpy().squeeze(),
+        "qpos_std": qpos_std.numpy().squeeze(),
+        "example_qpos": qpos,
+        "use_proprioception": proprioception,
+        'use_gripper_proprio': gripper_proprio,
+        "absolute_actions": absolute_actions,
+        }
 
     return stats, all_demos
 

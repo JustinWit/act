@@ -224,6 +224,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         stats = pickle.load(f)
         assert stats['use_proprioception'] == proprioception
         assert stats['use_gripper_proprio'] == config['gripper_proprio']
+        assert stats['absolute_actions'] == config['absolute_actions']
 
     pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean'].cpu().numpy()) / stats['qpos_std'].cpu().numpy()
     post_process = lambda a: a * stats['action_std'].cpu().numpy() + stats['action_mean'].cpu().numpy()
