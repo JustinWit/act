@@ -8,7 +8,8 @@ python imitate_episodes.py \
 --num_epochs 20000 --lr 5e-5 \
 --seed 0 \
 --run_name $2 \
---preload_to_gpu \
 --absolute_actions \
+--full_size_img \
+# --preload_to_gpu \
 # --gripper_proprio \
 # --no_proprioception \

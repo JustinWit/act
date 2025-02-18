@@ -100,6 +100,7 @@ def get_norm_stats(
     preload_to_gpu=False,
     gripper_proprio=False,
     absolute_actions=False,
+    full_size_img=False,
     ):
     all_qpos_data = []
     all_action_data = []
@@ -119,7 +120,7 @@ def get_norm_stats(
         all_demos.append({
             "qpos": torch.from_numpy(qpos).float(),
             "action": torch.from_numpy(action).float(),
-            "camera": preproc_imgs(root['rgb_frames']),
+            "camera": preproc_imgs(root['rgb_frames'], full_size_img=full_size_img),
         })
         if preload_to_gpu:
             for k, v in all_demos[-1].items():
@@ -169,22 +170,26 @@ def get_action(root, absolute=False):
     return action
 
 
-def preproc_imgs(imgs):
+def preproc_imgs(imgs, full_size_img=False):
     if imgs.shape[1] == 3:  # real data has 3 cams
         imgs = imgs[:, 2]  # we only use the front cam
         assert imgs.shape[1:] == (360, 640, 3)
         imgs = imgs[:, :, 140: 500]
         assert imgs.shape[1:] == (360, 360, 3)
-        # downsize to 256 x 256
-        resized_imgs = []
-        for i in range(imgs.shape[0]):
-            resized_imgs.append(cv2.resize(imgs[i], (256, 256)))
-        imgs = np.stack(resized_imgs, axis=0)
+        if not full_size_img:
+            # downsize to 256 x 256
+            resized_imgs = []
+            for i in range(imgs.shape[0]):
+                resized_imgs.append(cv2.resize(imgs[i], (256, 256)))
+            imgs = np.stack(resized_imgs, axis=0)
     elif imgs.shape[1] == 1:  # sim data has one cam
         imgs = imgs[:, 0]
     else:
         raise ValueError('Unknown camera shape')
-    assert imgs.shape[1:] == (256, 256, 3)
+    if full_size_img:
+        assert imgs.shape[1:] == (360, 360, 3)
+    else:
+        assert imgs.shape[1:] == (256, 256, 3)
     # convert bgr to rgb
     imgs = imgs[..., ::-1]
     imgs = torch.from_numpy(imgs.copy()).float() / 255.0
@@ -226,6 +231,7 @@ def load_data(
     preload_to_gpu=False,
     gripper_proprio=False,
     absolute_actions=False,
+    full_size_img=False,
     ):
 
     print(f'\nData from: {dataset_dir}\n')
@@ -243,6 +249,7 @@ def load_data(
         preload_to_gpu=preload_to_gpu,
         gripper_proprio=gripper_proprio,
         absolute_actions=absolute_actions,
+        full_size_img=full_size_img,
         )
 
     # construct dataset and dataloader

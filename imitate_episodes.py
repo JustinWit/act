@@ -93,6 +93,7 @@ def main(args):
         'batch_size': batch_size_train,
         "gripper_proprio": args['gripper_proprio'],
         'absolute_actions': args['absolute_actions'],
+        'full_size_img': args['full_size_img'],
     }
 
     if is_eval:
@@ -137,6 +138,7 @@ def main(args):
         preload_to_gpu=args['preload_to_gpu'],
         gripper_proprio=args['gripper_proprio'],
         absolute_actions=args['absolute_actions'],
+        full_size_img=args['full_size_img'],
         )
 
     # save dataset stats
@@ -225,6 +227,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         assert stats['use_proprioception'] == proprioception
         assert stats['use_gripper_proprio'] == config['gripper_proprio']
         assert stats['absolute_actions'] == config['absolute_actions']
+        assert stats['full_size_img'] == config['full_size_img']
 
     pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean'].cpu().numpy()) / stats['qpos_std'].cpu().numpy()
     post_process = lambda a: a * stats['action_std'].cpu().numpy() + stats['action_mean'].cpu().numpy()
@@ -324,7 +327,8 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 # process and store image
                 assert color_frame.shape == (360, 640, 3)
                 color_frame = color_frame[:, 140:500]  # center crop 360x360
-                color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
+                if not config['full_size_img']:
+                    color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
                 color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB
                 # image_list.append(color_frame)
 
@@ -568,6 +572,7 @@ if __name__ == '__main__':
     parser.add_argument('--preload_to_gpu', action='store_true')
     parser.add_argument('--gripper_proprio', action='store_true')
     parser.add_argument('--absolute_actions', action='store_true')
+    parser.add_argument('--full_size_img', action='store_true')
     args = vars(parser.parse_args())
     if args['gripper_proprio']:
         assert not args['no_proprioception']

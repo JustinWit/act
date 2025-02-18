@@ -70,6 +70,8 @@ def get_args_parser():
     parser.add_argument('--ckpt_name', action='store', type=str, help='checkpoint name, used only for eval')
     parser.add_argument('--gripper_proprio', action='store_true')
     parser.add_argument('--absolute_actions', action='store_true')
+    parser.add_argument('--full_size_img', action='store_true')
+
     return parser
 
 
