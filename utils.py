@@ -150,6 +150,7 @@ def get_norm_stats(
         "use_proprioception": proprioception,
         'use_gripper_proprio': gripper_proprio,
         "absolute_actions": absolute_actions,
+        "full_size_img": full_size_img,
         }
 
     return stats, all_demos
