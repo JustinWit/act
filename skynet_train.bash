@@ -4,7 +4,7 @@
 #SBATCH -G 2080_ti:1
 #SBATCH -c 7
 #SBATCH --qos=short
-#SBATCH -x hal,friday
+#SBATCH -x hal,friday,irona
 
 set -ex
 nvidia-smi
