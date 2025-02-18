@@ -214,8 +214,8 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         stats = pickle.load(f)
         assert stats['use_proprioception'] == proprioception
 
-    pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean']) / stats['qpos_std']
-    post_process = lambda a: a * stats['action_std'] + stats['action_mean']
+    pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean'].cpu().numpy()) / stats['qpos_std'].cpu().numpy()
+    post_process = lambda a: a * stats['action_std'].cpu().numpy() + stats['action_mean'].cpu().numpy()
 
 
     # Configure Camera Stream
@@ -320,7 +320,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                     qpos = np.concatenate([
                         pos.flatten(),
                         R.from_quat(quat).as_rotvec(),
-                        robot_interface.last_gripper_q,
+                        [robot_interface.last_gripper_q],
                         ])
                     qpos = pre_process(qpos)
                 else:

@@ -10,7 +10,6 @@ python imitate_episodes.py \
 --num_epochs 20000 --lr 1e-4 \
 --seed 0 \
 --ckpt_name $3 \
---preload_data \
 --no_proprioception \
 --run_name eval \
 # --temporal_agg \
