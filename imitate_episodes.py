@@ -46,7 +46,6 @@ def main(args):
     # else:
     # task_config = TASK_CONFIGS[task_name]
     dataset_dir = os.path.join("datasets", task_name)
-    num_episodes = len([x for x in os.listdir(dataset_dir) if x.endswith('.pkl')])
     # episode_len = task_config['episode_len']
     camera_names = ['rgb_frames']
 
@@ -126,6 +125,7 @@ def main(args):
     #     print()
     #     exit()
 
+    num_episodes = len([x for x in os.listdir(dataset_dir) if x.endswith('.pkl')])
     train_dataloader, val_dataloader, stats, _ = load_data(
         dataset_dir,
         num_episodes,
