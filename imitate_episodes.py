@@ -92,11 +92,17 @@ def main(args):
         # 'real_robot': not is_sim,
         'log_wandb': log_wandb,
         'batch_size': batch_size_train,
+        "gripper_proprio": args['gripper_proprio'],
     }
 
     if is_eval:
         ckpt_name = args['ckpt_name']
-        eval_bc(config, ckpt_name, not args['no_proprioception'], save_episode=True)
+        eval_bc(
+            config,
+            ckpt_name,
+            not args['no_proprioception'],
+            save_episode=True,
+        )
         exit()
 
     if log_wandb:
@@ -128,6 +134,7 @@ def main(args):
         proprioception=not args['no_proprioception'],
         chunk_size=args['chunk_size'],
         preload_to_gpu=args['preload_to_gpu'],
+        gripper_proprio=args['gripper_proprio'],
         )
 
     # save dataset stats
@@ -213,6 +220,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
         assert stats['use_proprioception'] == proprioception
+        assert stats['use_gripper_proprio'] == config['gripper_proprio']
 
     pre_process = lambda s_qpos: (s_qpos - stats['qpos_mean'].cpu().numpy()) / stats['qpos_std'].cpu().numpy()
     post_process = lambda a: a * stats['action_std'].cpu().numpy() + stats['action_mean'].cpu().numpy()
@@ -320,7 +328,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                     qpos = np.concatenate([
                         pos.flatten(),
                         R.from_quat(quat).as_rotvec(),
-                        [robot_interface.last_gripper_q],
+                        [robot_interface.last_gripper_q] if config['gripper_proprio'] else [0.0],
                         ])
                     qpos = pre_process(qpos)
                 else:
@@ -553,5 +561,9 @@ if __name__ == '__main__':
     parser.add_argument('--temporal_agg', action='store_true')
     parser.add_argument('--no_proprioception', action='store_true')
     parser.add_argument('--preload_to_gpu', action='store_true')
+    parser.add_argument('--gripper_proprio', action='store_true')
+    args = vars(parser.parse_args())
+    if args['gripper_proprio']:
+        assert not args['no_proprioception']
 
-    main(vars(parser.parse_args()))
+    main(args)

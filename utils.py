@@ -19,7 +19,6 @@ class EpisodicDataset(torch.utils.data.Dataset):
             dataset_dir,
             camera_names,
             norm_stats,
-            proprioception=True,
             chunk_size=None,
             all_demos=None,
             preload_to_gpu=False,
@@ -37,7 +36,6 @@ class EpisodicDataset(torch.utils.data.Dataset):
                 if preload_to_gpu:
                     self.norm_stats[k] = self.norm_stats[k].cuda()
         self.is_sim = None
-        self.use_proprio = proprioception
         # self.__getitem__(0) # initialize self.is_sim
         self.is_sim = False
         self.chunk_size = chunk_size
@@ -99,6 +97,7 @@ def get_norm_stats(
     num_episodes,
     proprioception=True,
     preload_to_gpu=False,
+    gripper_proprio=False,
     ):
     all_qpos_data = []
     all_action_data = []
@@ -108,7 +107,7 @@ def get_norm_stats(
         # dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
         with open(os.path.join(dataset_dir, episode_path), 'rb') as dbfile:
             root = pkl.load(dbfile)
-        qpos = get_proprioception(root)
+        qpos = get_proprioception(root, gripper_proprio=gripper_proprio)
         if not proprioception:
             qpos = np.zeros_like(qpos)
         action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
@@ -141,38 +140,42 @@ def get_norm_stats(
 
     stats = {"action_mean": action_mean.numpy().squeeze(), "action_std": action_std.numpy().squeeze(),
              "qpos_mean": qpos_mean.numpy().squeeze(), "qpos_std": qpos_std.numpy().squeeze(),
-             "example_qpos": qpos, "use_proprioception": proprioception}
+             "example_qpos": qpos, "use_proprioception": proprioception, 'use_gripper_proprio': gripper_proprio}
 
     return stats, all_demos
 
 
 def preproc_imgs(imgs):
     if imgs.shape[1] == 3:  # real data has 3 cams
-        cam_image = imgs[:, 2]
-        assert cam_image.shape[1:] == (360, 640, 3)
-        cam_image = cam_image[:, 140: 500]
+        imgs = imgs[:, 2]  # we only use the front cam
+        assert imgs.shape[1:] == (360, 640, 3)
+        imgs = imgs[:, :, 140: 500]
+        assert imgs.shape[1:] == (360, 360, 3)
         # downsize to 256 x 256
         resized_imgs = []
-        for i in range(cam_image.shape[0]):
-            resized_imgs.append(cv2.resize(cam_image[i], (256, 256)))
-        cam_image = np.stack(resized_imgs, axis=0)
+        for i in range(imgs.shape[0]):
+            resized_imgs.append(cv2.resize(imgs[i], (256, 256)))
+        imgs = np.stack(resized_imgs, axis=0)
     elif imgs.shape[1] == 1:  # sim data has one cam
-        cam_image = imgs[:, 0]
-        assert cam_image.shape[1:] == (256, 256, 3)
+        imgs = imgs[:, 0]
     else:
         raise ValueError('Unknown camera shape')
+    assert imgs.shape[1:] == (256, 256, 3)
     # convert bgr to rgb
-    cam_image = cam_image[..., ::-1]
-    cam_image = torch.from_numpy(cam_image.copy()).float() / 255.0
-    cam_image = torch.einsum('k h w c -> k c h w', cam_image)
-    return cam_image
+    imgs = imgs[..., ::-1]
+    imgs = torch.from_numpy(imgs.copy()).float() / 255.0
+    imgs = torch.einsum('k h w c -> k c h w', imgs)
+    return imgs
 
 
-def get_proprioception(data):
+def get_proprioception(data, gripper_proprio=False):
     if np.isclose(data['gripper_state'].max(), 0.04, atol=1e-2):
         data['gripper_state'] *= 2
     axis_angle = np.concatenate([[R.from_quat(i).as_rotvec()] for i in data['eef_quat']])
-    qpos = np.hstack((data['eef_pos'].squeeze(), axis_angle, data['gripper_state'][:, None]))
+    gripper = data['gripper_state'][:, None]
+    if not gripper_proprio:
+        gripper = np.zeros_like(gripper)
+    qpos = np.hstack((data['eef_pos'].squeeze(), axis_angle, gripper))
     return qpos
 
 
@@ -197,6 +200,7 @@ def load_data(
     proprioception=True,
     chunk_size=None,
     preload_to_gpu=False,
+    gripper_proprio=False,
     ):
 
     print(f'\nData from: {dataset_dir}\n')
@@ -212,6 +216,7 @@ def load_data(
         num_episodes,
         proprioception=proprioception,
         preload_to_gpu=preload_to_gpu,
+        gripper_proprio=gripper_proprio,
         )
 
     # construct dataset and dataloader
@@ -220,7 +225,6 @@ def load_data(
         dataset_dir,
         camera_names,
         norm_stats,
-        proprioception=proprioception,
         chunk_size=chunk_size,
         all_demos=all_demos,
         preload_to_gpu=preload_to_gpu,
