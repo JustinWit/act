@@ -148,24 +148,25 @@ def get_norm_stats(
 
 def preproc_imgs(imgs):
     if imgs.shape[1] == 3:  # real data has 3 cams
-        cam_image = imgs[:, 2]
-        assert cam_image.shape[1:] == (360, 640, 3)
-        cam_image = cam_image[:, 140: 500]
+        imgs = imgs[:, 2]  # we only use the front cam
+        assert imgs.shape[1:] == (360, 640, 3)
+        imgs = imgs[:, :, 140: 500]
+        assert imgs.shape[1:] == (360, 360, 3)
         # downsize to 256 x 256
         resized_imgs = []
-        for i in range(cam_image.shape[0]):
-            resized_imgs.append(cv2.resize(cam_image[i], (256, 256)))
-        cam_image = np.stack(resized_imgs, axis=0)
+        for i in range(imgs.shape[0]):
+            resized_imgs.append(cv2.resize(imgs[i], (256, 256)))
+        imgs = np.stack(resized_imgs, axis=0)
     elif imgs.shape[1] == 1:  # sim data has one cam
-        cam_image = imgs[:, 0]
-        assert cam_image.shape[1:] == (256, 256, 3)
+        imgs = imgs[:, 0]
     else:
         raise ValueError('Unknown camera shape')
+    assert imgs.shape[1:] == (256, 256, 3)
     # convert bgr to rgb
-    cam_image = cam_image[..., ::-1]
-    cam_image = torch.from_numpy(cam_image.copy()).float() / 255.0
-    cam_image = torch.einsum('k h w c -> k c h w', cam_image)
-    return cam_image
+    imgs = imgs[..., ::-1]
+    imgs = torch.from_numpy(imgs.copy()).float() / 255.0
+    imgs = torch.einsum('k h w c -> k c h w', imgs)
+    return imgs
 
 
 def get_proprioception(data):
