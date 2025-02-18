@@ -19,7 +19,6 @@ class EpisodicDataset(torch.utils.data.Dataset):
             dataset_dir,
             camera_names,
             norm_stats,
-            proprioception=True,
             chunk_size=None,
             all_demos=None,
             preload_to_gpu=False,
@@ -37,7 +36,6 @@ class EpisodicDataset(torch.utils.data.Dataset):
                 if preload_to_gpu:
                     self.norm_stats[k] = self.norm_stats[k].cuda()
         self.is_sim = None
-        self.use_proprio = proprioception
         # self.__getitem__(0) # initialize self.is_sim
         self.is_sim = False
         self.chunk_size = chunk_size
@@ -91,6 +89,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
         # added this since the actions just get truncated by the model anyways
         padded_action = padded_action[:self.chunk_size]
         is_pad = is_pad[:self.chunk_size]
+        breakpoint()
         return cam_image, qpos, padded_action, is_pad
 
 
@@ -99,6 +98,7 @@ def get_norm_stats(
     num_episodes,
     proprioception=True,
     preload_to_gpu=False,
+    gripper_proprio=False,
     ):
     all_qpos_data = []
     all_action_data = []
@@ -108,7 +108,7 @@ def get_norm_stats(
         # dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
         with open(os.path.join(dataset_dir, episode_path), 'rb') as dbfile:
             root = pkl.load(dbfile)
-        qpos = get_proprioception(root)
+        qpos = get_proprioception(root, gripper_proprio=gripper_proprio)
         if not proprioception:
             qpos = np.zeros_like(qpos)
         action = np.hstack((root['arm_action'], root['gripper_action'][:, None]))
@@ -141,7 +141,7 @@ def get_norm_stats(
 
     stats = {"action_mean": action_mean.numpy().squeeze(), "action_std": action_std.numpy().squeeze(),
              "qpos_mean": qpos_mean.numpy().squeeze(), "qpos_std": qpos_std.numpy().squeeze(),
-             "example_qpos": qpos, "use_proprioception": proprioception}
+             "example_qpos": qpos, "use_proprioception": proprioception, 'use_gripper_proprio': gripper_proprio}
 
     return stats, all_demos
 
@@ -169,11 +169,14 @@ def preproc_imgs(imgs):
     return imgs
 
 
-def get_proprioception(data):
+def get_proprioception(data, gripper_proprio=False):
     if np.isclose(data['gripper_state'].max(), 0.04, atol=1e-2):
         data['gripper_state'] *= 2
     axis_angle = np.concatenate([[R.from_quat(i).as_rotvec()] for i in data['eef_quat']])
-    qpos = np.hstack((data['eef_pos'].squeeze(), axis_angle, data['gripper_state'][:, None]))
+    gripper = data['gripper_state'][:, None]
+    if not gripper_proprio:
+        gripper = np.zeros_like(gripper)
+    qpos = np.hstack((data['eef_pos'].squeeze(), axis_angle, gripper))
     return qpos
 
 
@@ -198,6 +201,7 @@ def load_data(
     proprioception=True,
     chunk_size=None,
     preload_to_gpu=False,
+    gripper_proprio=False,
     ):
 
     print(f'\nData from: {dataset_dir}\n')
@@ -213,6 +217,7 @@ def load_data(
         num_episodes,
         proprioception=proprioception,
         preload_to_gpu=preload_to_gpu,
+        gripper_proprio=gripper_proprio,
         )
 
     # construct dataset and dataloader
@@ -221,7 +226,6 @@ def load_data(
         dataset_dir,
         camera_names,
         norm_stats,
-        proprioception=proprioception,
         chunk_size=chunk_size,
         all_demos=all_demos,
         preload_to_gpu=preload_to_gpu,
