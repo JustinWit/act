@@ -190,7 +190,8 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     from deoxys.utils.config_utils import get_default_controller_config
     from deoxys.experimental.motion_utils import reset_joints_to
     # from deoxys.utils.transform_utils import quat2axisangle, mat2quat, euler2mat
-    from scipy.spatial.transform import Rotation as R
+    # from scipy.spatial.transform import Rotation as R
+    from deoxys_transform_utils import quat2axisangle
     import cv2
     from record_eval import RecordEval
 
@@ -327,7 +328,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                     quat, pos = robot_interface.last_eef_quat_and_pos
                     qpos = np.concatenate([
                         pos.flatten(),
-                        R.from_quat(quat).as_rotvec(),
+                        quat2axisangle(quat),
                         [robot_interface.last_gripper_q] if config['gripper_proprio'] else [0.0],
                         ])
                     qpos = pre_process(qpos)

@@ -7,7 +7,8 @@ from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import cv2
-from scipy.spatial.transform import Rotation as R
+from deoxys_transform_utils import quat2axisangle
+# from scipy.spatial.transform import Rotation as R
 
 import IPython
 e = IPython.embed
@@ -171,7 +172,7 @@ def preproc_imgs(imgs):
 def get_proprioception(data, gripper_proprio=False):
     if np.isclose(data['gripper_state'].max(), 0.04, atol=1e-2):
         data['gripper_state'] *= 2
-    axis_angle = np.concatenate([[R.from_quat(i).as_rotvec()] for i in data['eef_quat']])
+    axis_angle = np.concatenate([[quat2axisangle(i)] for i in data['eef_quat']])
     gripper = data['gripper_state'][:, None]
     if not gripper_proprio:
         gripper = np.zeros_like(gripper)
