@@ -21,7 +21,7 @@ from sim_env import BOX_POSE
 
 import IPython
 e = IPython.embed
-
+import time
 
 import wandb
 
@@ -259,6 +259,8 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
             0.8480939705504309,
         ]
 
+    robot_interface.gripper_control(-1.0)
+    time.sleep(1)
     reset_joints_to(robot_interface, reset_joint_positions)  # reset joints to home position
 
 #     # load environment
