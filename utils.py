@@ -7,7 +7,7 @@ from torch.utils.data import TensorDataset, DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import cv2
-from deoxys_transform_utils import quat2axisangle, axisangle2quat, quat_multiply
+from deoxys_transform_utils import quat2axisangle, axisangle2quat, quat_multiply, mat2quat
 # from scipy.spatial.transform import Rotation as R
 
 import IPython
@@ -201,7 +201,9 @@ def preproc_imgs(imgs, full_size_img=False):
 def get_proprioception(data, gripper_proprio=False):
     if np.isclose(data['gripper_state'].max(), 0.04, atol=1e-2):
         data['gripper_state'] *= 2
-    axis_angle = np.concatenate([[quat2axisangle(i)] for i in data['eef_quat']])
+    # NOTE 'eef_quat' is "current_quat" which is negated based on "target_quat". We want to use raw robot quats
+    raw_quats = [mat2quat(x[:3, :3]) for x in data['eef_pose']]
+    axis_angle = np.concatenate([[quat2axisangle(i)] for i in raw_quats])
     gripper = data['gripper_state'][:, None]
     if not gripper_proprio:
         gripper = np.zeros_like(gripper)
