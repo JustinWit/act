@@ -144,3 +144,4 @@ dmypy.json
 # models
 act_models
 old_act_models
+old_act_models_wrong_proprio
