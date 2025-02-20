@@ -203,7 +203,7 @@ def get_proprioception(data, gripper_proprio=False):
         data['gripper_state'] *= 2
     # NOTE 'eef_quat' is "current_quat" which is negated based on "target_quat". We want to use raw robot quats
     raw_quats = [mat2quat(x[:3, :3]) for x in data['eef_pose']]
-    axis_angle = np.concatenate([[quat2axisangle(i)] if quat2axisangle(i)[0] > 0.0 else quat2axisangle(-i) for i in raw_quats])
+    axis_angle = np.concatenate([[quat2axisangle(i)] if quat2axisangle(i)[0] > 0.0 else [quat2axisangle(-i)] for i in raw_quats])
     gripper = data['gripper_state'][:, None]
     if not gripper_proprio:
         gripper = np.zeros_like(gripper)
