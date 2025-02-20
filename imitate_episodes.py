@@ -335,9 +335,13 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
                 if proprioception:
                     quat, pos = robot_interface.last_eef_quat_and_pos
+                    if quat2axisangle(quat)[0] > 0:
+                        axis_angle = quat2axisangle(quat)
+                    else:
+                        axis_angle = quat2axisangle(-quat)
                     qpos = np.concatenate([
                         pos.flatten(),
-                        quat2axisangle(quat),
+                        axis_angle,
                         [robot_interface.last_gripper_q] if config['gripper_proprio'] else [0.0],
                         ])
                     qpos = pre_process(qpos)
