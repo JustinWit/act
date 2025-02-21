@@ -259,7 +259,8 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
             0.8480939705504309,
         ]
 
-    robot_interface.gripper_control(-1.0)
+    while robot_interface.last_gripper_q is None or robot_interface.last_gripper_q < 0.05:
+        robot_interface.gripper_control(-1.0)
     time.sleep(1)
     reset_joints_to(robot_interface, reset_joint_positions, timeout=100)  # reset joints to home position
 
