@@ -12,7 +12,7 @@ class RecordEval():
         self.ckpt_name = ckpt_name.split('.')[0]
         self.image_subscriber = ZMQCameraSubscriber(
                                     host = "143.215.128.151",
-                                    port = "10007",  # 5 - top, 6 - side, 7 - front
+                                    port = "10005",  # 5 - top, 6 - side, 7 - front
                                     topic_type = 'RGB'
                                 )
         self.record_thread = threading.Thread(target=self.save_frames)
