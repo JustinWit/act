@@ -259,7 +259,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
             0.8480939705504309,
         ]
 
-    while robot_interface.last_gripper_q is None or robot_interface.last_gripper_q < 0.05:
+    while robot_interface.last_gripper_q is None or robot_interface.last_gripper_q < 0.07:
         robot_interface.gripper_control(-1.0)
     time.sleep(1)
     reset_joints_to(robot_interface, reset_joint_positions, timeout=100)  # reset joints to home position
@@ -307,8 +307,12 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
         qpos_history = torch.zeros((1, max_timesteps, state_dim)).cuda()
         # image_list = [] # for visualization
-        video_recorder = RecordEval(ckpt_name)
-        video_recorder.start()
+        video_recorder_hd = RecordEval(ckpt_name, 10005)
+        video_recorder_overview = RecordEval(ckpt_name, 10006)
+        video_recorder_pov = RecordEval(ckpt_name, 10007)
+        video_recorder_hd.start()
+        video_recorder_overview.start()
+        video_recorder_pov.start()
         # qpos_list = []
         # target_qpos_list = []
         # rewards = []
@@ -404,7 +408,9 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 # target_qpos_list.append(target_qpos)
                 # rewards.append(ts.reward)
 
-        video_recorder.stop(os.path.join(ckpt_dir, 'videos'))
+        video_recorder_hd.stop(os.path.join(ckpt_dir, 'videos_hd'))
+        video_recorder_pov.stop(os.path.join(ckpt_dir, 'videos_pov'))
+        video_recorder_overview.stop(os.path.join(ckpt_dir, 'videos_overview'))
 
 #             plt.close()
         # if real_robot:

@@ -6,13 +6,13 @@ import datetime
 import os
 
 class RecordEval():
-    def __init__(self, ckpt_name):
+    def __init__(self, ckpt_name, port_num):
         self.image_list = []
         self.record = False
         self.ckpt_name = ckpt_name.split('.')[0]
         self.image_subscriber = ZMQCameraSubscriber(
                                     host = "143.215.128.151",
-                                    port = "10005",  # 5 - top, 6 - side, 7 - front
+                                    port = port_num,  # 5 - top, 6 - side, 7 - front
                                     topic_type = 'RGB'
                                 )
         self.record_thread = threading.Thread(target=self.save_frames)
