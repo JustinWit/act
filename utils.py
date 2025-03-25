@@ -146,7 +146,7 @@ def get_norm_stats(
         "action_std": action_std.numpy().squeeze(),
         "qpos_mean": qpos_mean.numpy().squeeze(),
         "qpos_std": qpos_std.numpy().squeeze(),
-        "example_qpos": qpos,
+        "example_qpos": qpos,  # maybe delete this ?
         "use_proprioception": proprioception,
         'use_gripper_proprio': gripper_proprio,
         "absolute_actions": absolute_actions,

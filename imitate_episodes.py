@@ -93,6 +93,7 @@ def main(args):
         "gripper_proprio": args['gripper_proprio'],
         'absolute_actions': args['absolute_actions'],
         'full_size_img': args['full_size_img'],
+        'include_real+': args['include_real'],
     }
 
     if is_eval:
@@ -131,7 +132,7 @@ def main(args):
         dataset_dir,
         num_episodes,
         camera_names,
-        batch_size_train,
+        int(batch_size_train * (1 - args['include_real'])),
         batch_size_val,
         proprioception=not args['no_proprioception'],
         chunk_size=args['chunk_size'],
@@ -140,15 +141,51 @@ def main(args):
         absolute_actions=args['absolute_actions'],
         full_size_img=args['full_size_img'],
         )
+    final_stats = stats
+
+    # create dataloader for real data
+    if args['include_real'] > 0:
+        real_dataset_dir = os.path.join("datasets", "real_pick_coke")  # hardcoded for now
+        real_num_episodes = len([x for x in os.listdir(real_dataset_dir) if x.endswith('.pkl')])
+        real_train_dataloader, real_val_dataloader, real_stats, _ = load_data(
+            real_dataset_dir,
+            real_num_episodes,
+            camera_names,
+            int(batch_size_train * args['include_real']),
+            batch_size_val,
+            proprioception=not args['no_proprioception'],
+            chunk_size=args['chunk_size'],
+            preload_to_gpu=args['preload_to_gpu'],
+            gripper_proprio=args['gripper_proprio'],
+            absolute_actions=args['absolute_actions'],
+            full_size_img=args['full_size_img'],
+            )
+
+        final_stats = {}
+        # merge stats
+        for key in stats:
+            if key == 'example_qpos':
+                continue
+            final_stats[key] = stats[key] * (1 - args['include_real']) + real_stats[key] * args['include_real']
+
+
+        # update dataloader stats
+        train_dataloader.norm_stats = final_stats
+        real_train_dataloader.norm_stats = final_stats
+
+    # breakpoint()
 
     # save dataset stats
     if not os.path.isdir(ckpt_dir):
         os.makedirs(ckpt_dir)
     stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
     with open(stats_path, 'wb') as f:
-        pickle.dump(stats, f)
+        pickle.dump(final_stats, f)
 
-    best_ckpt_info = train_bc(train_dataloader, val_dataloader, config)
+    if args['include_real'] > 0:
+        best_ckpt_info = train_bc(train_dataloader, real_train_dataloader, val_dataloader, config)
+    else:
+        best_ckpt_info = train_bc(train_dataloader, None, val_dataloader, config)
     # best_epoch, min_val_loss, best_state_dict = best_ckpt_info
 
     # # save best checkpoint
@@ -453,7 +490,7 @@ def forward_pass(data, policy):
     return policy(qpos_data, image_data, action_data, is_pad)
 
 
-def train_bc(train_dataloader, val_dataloader, config):
+def train_bc(train_dataloader, real_train_dataloader, val_dataloader, config):
     num_epochs = config['num_epochs']
     ckpt_dir = config['ckpt_dir']
     seed = config['seed']
@@ -501,7 +538,14 @@ def train_bc(train_dataloader, val_dataloader, config):
         # training
         policy.train()
         optimizer.zero_grad()
-        for batch_idx, data in enumerate(train_dataloader):
+        if real_train_dataloader is None:
+            data_loader = train_dataloader
+        else:
+            data_loader = zip(train_dataloader, real_train_dataloader)
+        for batch_idx, data in enumerate(data_loader):
+            if real_train_dataloader is not None:
+                data = [torch.concatenate((data[0][i], data[1][i])) for i in range(len(data[0]))]
+            # breakpoint()
             forward_dict = forward_pass(data, policy)
             # backward
             loss = forward_dict['loss']
@@ -585,6 +629,7 @@ if __name__ == '__main__':
     parser.add_argument('--gripper_proprio', action='store_true')
     parser.add_argument('--absolute_actions', action='store_true')
     parser.add_argument('--full_size_img', action='store_true')
+    parser.add_argument('--include_real', action='store', type=float, help='proportion of real to sim', required=False, default=0.2)
     args = vars(parser.parse_args())
     if args['gripper_proprio']:
         assert not args['no_proprioception']

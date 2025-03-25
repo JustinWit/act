@@ -71,6 +71,7 @@ def get_args_parser():
     parser.add_argument('--gripper_proprio', action='store_true')
     parser.add_argument('--absolute_actions', action='store_true')
     parser.add_argument('--full_size_img', action='store_true')
+    parser.add_argument('--include_real', action='store', type=float, help='proportion of real to sim', required=False, default=0.2)
 
     return parser
 
