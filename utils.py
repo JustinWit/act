@@ -42,6 +42,15 @@ class EpisodicDataset(torch.utils.data.Dataset):
         self.chunk_size = chunk_size
         self.all_demos = all_demos
 
+    def set_norm_stats(self, norm_stats):
+        self.norm_stats = norm_stats
+        # convert to tensor and move to gpu
+        for k, v in self.norm_stats.items():
+            if isinstance(v, np.ndarray):
+                self.norm_stats[k] = torch.from_numpy(v).float()
+                if self.preload_to_gpu:
+                    self.norm_stats[k] = self.norm_stats[k].cuda()
+
     def __len__(self):
         return len(self.episode_ids)
 
@@ -105,6 +114,7 @@ def get_norm_stats(
     all_qpos_data = []
     all_action_data = []
     all_demos = []
+    total_n = 0
     listdir = [x for x in os.listdir(dataset_dir) if x.endswith('.pkl')]
     for i, episode_path in enumerate(tqdm(listdir, desc='Loading data')):
         # dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
@@ -125,6 +135,7 @@ def get_norm_stats(
         if preload_to_gpu:
             for k, v in all_demos[-1].items():
                 all_demos[-1][k] = v.cuda().contiguous()
+        total_n += len(action)
 
     all_qpos_data = torch.vstack(all_qpos_data)
     # if not proprioception:
@@ -134,12 +145,12 @@ def get_norm_stats(
     # normalize action data
     action_mean = all_action_data.mean(dim=[0], keepdim=True)
     action_std = all_action_data.std(dim=[0], keepdim=True)
-    action_std = torch.clip(action_std, 1e-2, np.inf) # clipping
+    # action_std = torch.clip(action_std, 1e-2, np.inf) # clipping # NOTE: moved to imitate_episode so we clip after combining datasets
 
     # normalize qpos data
     qpos_mean = all_qpos_data.mean(dim=[0], keepdim=True)
     qpos_std = all_qpos_data.std(dim=[0], keepdim=True)
-    qpos_std = torch.clip(qpos_std, 1e-2, np.inf) # clipping
+    # qpos_std = torch.clip(qpos_std, 1e-2, np.inf) # clipping # NOTE: moved to imitate_episode so we clip after combining datasets
 
     stats = {
         "action_mean": action_mean.numpy().squeeze(),
@@ -151,6 +162,7 @@ def get_norm_stats(
         'use_gripper_proprio': gripper_proprio,
         "absolute_actions": absolute_actions,
         "full_size_img": full_size_img,
+        "total_n": total_n,
         }
 
     return stats, all_demos
@@ -358,3 +370,8 @@ def detach_dict(d):
 def set_seed(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
+
+def combined_std(mean1, std1, n1, mean2, std2, n2, combined_mean):
+    numerator = (n1 * std1**2 + n2 * std2**2 + n1 * (mean1 - combined_mean)**2 + n2 * (mean2 - combined_mean)**2)
+    denominator = n1 + n2
+    return np.sqrt(numerator / denominator)

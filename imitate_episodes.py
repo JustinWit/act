@@ -12,7 +12,7 @@ from constants import DT
 from constants import PUPPET_GRIPPER_JOINT_OPEN
 from utils import load_data # data functions
 from utils import sample_box_pose, sample_insertion_pose # robot functions
-from utils import compute_dict_mean, set_seed, detach_dict # helper functions
+from utils import compute_dict_mean, set_seed, detach_dict, combined_std # helper functions
 from policy import ACTPolicy, CNNMLPPolicy
 from visualize_episodes import save_videos
 
@@ -93,7 +93,7 @@ def main(args):
         "gripper_proprio": args['gripper_proprio'],
         'absolute_actions': args['absolute_actions'],
         'full_size_img': args['full_size_img'],
-        'include_real+': args['include_real'],
+        'real_ratio': args['real_ratio'],
     }
 
     if is_eval:
@@ -132,7 +132,7 @@ def main(args):
         dataset_dir,
         num_episodes,
         camera_names,
-        int(batch_size_train * (1 - args['include_real'])),
+        int(batch_size_train * (1 - args['real_ratio'])),
         batch_size_val,
         proprioception=not args['no_proprioception'],
         chunk_size=args['chunk_size'],
@@ -141,17 +141,16 @@ def main(args):
         absolute_actions=args['absolute_actions'],
         full_size_img=args['full_size_img'],
         )
-    final_stats = stats
 
     # create dataloader for real data
-    if args['include_real'] > 0:
-        real_dataset_dir = os.path.join("datasets", "real_pick_coke")  # hardcoded for now
+    if args['real_ratio'] > 0:
+        real_dataset_dir = os.path.join("datasets", args['real_data_dir'])
         real_num_episodes = len([x for x in os.listdir(real_dataset_dir) if x.endswith('.pkl')])
         real_train_dataloader, real_val_dataloader, real_stats, _ = load_data(
             real_dataset_dir,
             real_num_episodes,
             camera_names,
-            int(batch_size_train * args['include_real']),
+            int(batch_size_train * args['real_ratio']),
             batch_size_val,
             proprioception=not args['no_proprioception'],
             chunk_size=args['chunk_size'],
@@ -161,19 +160,30 @@ def main(args):
             full_size_img=args['full_size_img'],
             )
 
-        final_stats = {}
-        # merge stats
-        for key in stats:
-            if key == 'example_qpos':
-                continue
-            final_stats[key] = stats[key] * (1 - args['include_real']) + real_stats[key] * args['include_real']
+        p = stats['total_n'] / (stats['total_n'] + real_stats['total_n'])
+        combined_action_mean = p * stats['action_mean'] + (1 - p) * real_stats['action_mean']
+        combined_qpos_mean = p * stats['qpos_mean'] + (1 - p) * real_stats['qpos_mean']
+        final_stats = {
+            "action_mean": combined_action_mean,
+            "action_std": combined_std(stats['action_mean'], stats['action_std'], stats['total_n'], real_stats['action_mean'], real_stats['action_std'], real_stats['total_n'], combined_action_mean),
+            "qpos_mean": combined_qpos_mean,
+            "qpos_std": combined_std(stats['qpos_std'], stats['qpos_std'], stats['total_n'], real_stats['qpos_mean'], real_stats['qpos_std'], real_stats['total_n'], combined_qpos_mean),
+            # "example_qpos": stats['example_qpos'],  # maybe delete this ?
+            "use_proprioception": stats['use_proprioception'],
+            'use_gripper_proprio': stats['use_gripper_proprio'],
+            "absolute_actions": stats['absolute_actions'],
+            "full_size_img": stats['full_size_img'],
+            "total_n": stats['total_n'] + real_stats['total_n'],
+        }
 
-
-        # update dataloader stats
-        train_dataloader.norm_stats = final_stats
-        real_train_dataloader.norm_stats = final_stats
-
-    # breakpoint()
+    # update norm stats
+    if args['real_ratio'] == 0:
+        final_stats = stats
+    final_stats['action_std'] = torch.clip(final_stats['action_std'], 1e-2, np.inf)
+    final_stats['qpos_std'] = torch.clip(final_stats['qpos_std'], 1e-2, np.inf)
+    train_dataloader.dataset.set_norm_stats(final_stats)
+    if args['real_ratio'] > 0:
+        real_train_dataloader.dataset.set_norm_stats(final_stats)
 
     # save dataset stats
     if not os.path.isdir(ckpt_dir):
@@ -182,7 +192,7 @@ def main(args):
     with open(stats_path, 'wb') as f:
         pickle.dump(final_stats, f)
 
-    if args['include_real'] > 0:
+    if args['real_ratio'] > 0:
         best_ckpt_info = train_bc(train_dataloader, real_train_dataloader, val_dataloader, config)
     else:
         best_ckpt_info = train_bc(train_dataloader, None, val_dataloader, config)
@@ -538,14 +548,18 @@ def train_bc(train_dataloader, real_train_dataloader, val_dataloader, config):
         # training
         policy.train()
         optimizer.zero_grad()
-        if real_train_dataloader is None:
-            data_loader = train_dataloader
-        else:
-            data_loader = zip(train_dataloader, real_train_dataloader)
-        for batch_idx, data in enumerate(data_loader):
+        if real_train_dataloader is not None:
+            real_data_iter = iter(real_train_dataloader)
+
+        for batch_idx, data in enumerate(train_dataloader):
             if real_train_dataloader is not None:
-                data = [torch.concatenate((data[0][i], data[1][i])) for i in range(len(data[0]))]
-            # breakpoint()
+                try:
+                    real_data = next(real_data_iter)
+                except StopIteration:
+                    real_data_iter = iter(real_train_dataloader)
+                    real_data = next(real_data_iter)
+                data = [torch.cat((data[i], real_data[i])) for i in range(len(data))]
+
             forward_dict = forward_pass(data, policy)
             # backward
             loss = forward_dict['loss']
@@ -629,9 +643,12 @@ if __name__ == '__main__':
     parser.add_argument('--gripper_proprio', action='store_true')
     parser.add_argument('--absolute_actions', action='store_true')
     parser.add_argument('--full_size_img', action='store_true')
-    parser.add_argument('--include_real', action='store', type=float, help='proportion of real to sim', required=False, default=0.2)
+    parser.add_argument('--real_ratio', action='store', type=float, help='proportion of real to sim', required=False, default=0)
+    parser.add_argument('--real_data_dir', action='store', type=str, help='real_data_dir', required=False)
     args = vars(parser.parse_args())
     if args['gripper_proprio']:
         assert not args['no_proprioception']
+    if args['real_ratio'] > 0 or args['real_data_dir']:
+        assert args['real_data_dir'] and args['real_ratio'] > 0, "Must provide both real_data_dir and real_ratio"
 
     main(args)
