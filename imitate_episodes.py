@@ -136,12 +136,13 @@ def main(args):
         batch_size_val,
         proprioception=not args['no_proprioception'],
         chunk_size=args['chunk_size'],
+        preload_to_cpu=args['preload_to_cpu'],
         preload_to_gpu=args['preload_to_gpu'],
         gripper_proprio=args['gripper_proprio'],
         absolute_actions=args['absolute_actions'],
         full_size_img=args['full_size_img'],
         )
-
+    # breakpoint()
     # create dataloader for real data
     if args['real_ratio'] > 0:
         real_dataset_dir = os.path.join("datasets", args['real_data_dir'])
@@ -154,6 +155,7 @@ def main(args):
             batch_size_val,
             proprioception=not args['no_proprioception'],
             chunk_size=args['chunk_size'],
+            preload_to_cpu=args['preload_to_cpu'],
             preload_to_gpu=args['preload_to_gpu'],
             gripper_proprio=args['gripper_proprio'],
             absolute_actions=args['absolute_actions'],
@@ -559,7 +561,7 @@ def train_bc(train_dataloader, real_train_dataloader, val_dataloader, config):
                     real_data_iter = iter(real_train_dataloader)
                     real_data = next(real_data_iter)
                 data = [torch.cat((data[i], real_data[i])) for i in range(len(data))]
-
+            # breakpoint()
             forward_dict = forward_pass(data, policy)
             # backward
             loss = forward_dict['loss']
@@ -639,6 +641,7 @@ if __name__ == '__main__':
     parser.add_argument('--dim_feedforward', action='store', type=int, help='dim_feedforward', required=False)
     parser.add_argument('--temporal_agg', action='store_true')
     parser.add_argument('--no_proprioception', action='store_true')
+    parser.add_argument('--preload_to_cpu', action='store_true')
     parser.add_argument('--preload_to_gpu', action='store_true')
     parser.add_argument('--gripper_proprio', action='store_true')
     parser.add_argument('--absolute_actions', action='store_true')
@@ -650,5 +653,8 @@ if __name__ == '__main__':
         assert not args['no_proprioception']
     if args['real_ratio'] > 0 or args['real_data_dir']:
         assert args['real_data_dir'] and args['real_ratio'] > 0, "Must provide both real_data_dir and real_ratio"
+
+    if args['preload_to_cpu'] or args['preload_to_gpu']:
+        assert not (args['preload_to_cpu'] and args['preload_to_gpu']), "Cannot set preload to both CPU and GPU"
 
     main(args)

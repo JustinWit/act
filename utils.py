@@ -22,6 +22,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
             norm_stats,
             chunk_size=None,
             all_demos=None,
+            preload_to_cpu=False,
             preload_to_gpu=False,
             ):
         super(EpisodicDataset).__init__()
@@ -73,8 +74,24 @@ class EpisodicDataset(torch.utils.data.Dataset):
             )}),
         """
         sample_full_episode = False # hardcode
-        data = self.all_demos[index]
+        # breakpoint()
+        if self.all_demos is None:
+            # use f-string to format index to be three digits with leading zeros
+            episode_id = f'{self.episode_ids[index]:03d}'
+            dataset_path = os.path.join(self.dataset_dir, f'demo_{episode_id}.pkl')
+            with open(dataset_path, 'rb') as db:
+                root = pkl.load(db)
+                # data is not in the right format here we need to choose a not slow way to do this.
+            if self.norm_stats['use_proprioception']:
+                qpos = get_proprioception(root, gripper_proprio=self.norm_stats['use_gripper_proprio'])
 
+            data = {
+                "action": torch.from_numpy(get_action(root, self.norm_stats['absolute_actions'])).float(),
+                "camera": preproc_imgs(root['rgb_frames'], full_size_img=self.norm_stats['full_size_img'])
+            }
+        else:
+            data = self.all_demos[index]
+        # breakpoint()
         original_action_shape = data['action'].shape
         episode_len = original_action_shape[0]
 
@@ -87,7 +104,10 @@ class EpisodicDataset(torch.utils.data.Dataset):
         action_len = episode_len - start_ts
         action = data['action'][start_ts:]
         cam_image = data['camera'][start_ts: start_ts + 1]
-        qpos = data['qpos'][start_ts]
+        if self.norm_stats['use_proprioception']:
+            qpos = data['qpos'][start_ts].to(device='cuda' if self.preload_to_gpu else "cpu")
+        else:
+            qpos = torch.zeros(self.norm_stats['qpos_mean'].shape, device='cuda' if self.preload_to_gpu else "cpu")
 
         padded_action = torch.zeros_like(data['action'])
         padded_action[:action_len] = action
@@ -106,6 +126,7 @@ def get_norm_stats(
     dataset_dir,
     num_episodes,
     proprioception=True,
+    preload_to_cpu=False,
     preload_to_gpu=False,
     gripper_proprio=False,
     absolute_actions=False,
@@ -126,12 +147,12 @@ def get_norm_stats(
         action = get_action(root, absolute=absolute_actions)
         all_qpos_data.append(torch.from_numpy(qpos))
         all_action_data.append(torch.from_numpy(action))
-        # if preload_data:
-        all_demos.append({
-            "qpos": torch.from_numpy(qpos).float(),
-            "action": torch.from_numpy(action).float(),
-            "camera": preproc_imgs(root['rgb_frames'], full_size_img=full_size_img),
-        })
+        if preload_to_cpu or preload_to_gpu:
+            all_demos.append({
+                "qpos": torch.from_numpy(qpos).float(),
+                "action": torch.from_numpy(action).float(),
+                "camera": preproc_imgs(root['rgb_frames'], full_size_img=full_size_img),
+            })
         if preload_to_gpu:
             for k, v in all_demos[-1].items():
                 all_demos[-1][k] = v.cuda().contiguous()
@@ -157,15 +178,14 @@ def get_norm_stats(
         "action_std": action_std.numpy().squeeze(),
         "qpos_mean": qpos_mean.numpy().squeeze(),
         "qpos_std": qpos_std.numpy().squeeze(),
-        "example_qpos": qpos,  # maybe delete this ?
+        "example_qpos": None,  # qpos,  # maybe delete this ?
         "use_proprioception": proprioception,
         'use_gripper_proprio': gripper_proprio,
         "absolute_actions": absolute_actions,
         "full_size_img": full_size_img,
         "total_n": total_n,
         }
-
-    return stats, all_demos
+    return stats, all_demos if len(all_demos) > 0 else None
 
 
 def get_action(root, absolute=False):
@@ -243,6 +263,7 @@ def load_data(
     batch_size_val,
     proprioception=True,
     chunk_size=None,
+    preload_to_cpu=False,
     preload_to_gpu=False,
     gripper_proprio=False,
     absolute_actions=False,
@@ -261,6 +282,7 @@ def load_data(
         dataset_dir,
         num_episodes,
         proprioception=proprioception,
+        preload_to_cpu=preload_to_cpu,
         preload_to_gpu=preload_to_gpu,
         gripper_proprio=gripper_proprio,
         absolute_actions=absolute_actions,
@@ -275,6 +297,7 @@ def load_data(
         norm_stats,
         chunk_size=chunk_size,
         all_demos=all_demos,
+        preload_to_cpu=preload_to_cpu,
         preload_to_gpu=preload_to_gpu,
         )
     # val_dataset = EpisodicDataset(
