@@ -103,7 +103,10 @@ class EpisodicDataset(torch.utils.data.Dataset):
         # get all actions after and including start_ts
         action_len = episode_len - start_ts
         action = data['action'][start_ts:]
-        cam_image = preproc_imgs(data['camera'][start_ts: start_ts + 1])
+        if self.all_demos is None:
+            cam_image = preproc_imgs(data['camera'][start_ts: start_ts + 1])
+        else:
+            cam_image = data['camera'][start_ts: start_ts + 1]
         if self.norm_stats['use_proprioception']:
             qpos = data['qpos'][start_ts].to(device='cuda' if self.preload_to_gpu else "cpu")
         else:
