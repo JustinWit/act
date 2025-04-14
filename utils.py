@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import cv2
 from deoxys_transform_utils import quat2axisangle, axisangle2quat, quat_multiply, mat2quat
+import h5py
 # from scipy.spatial.transform import Rotation as R
 
 import IPython
@@ -74,49 +75,83 @@ class EpisodicDataset(torch.utils.data.Dataset):
             )}),
         """
         sample_full_episode = False # hardcode
-        # breakpoint()
+
+        ##############################
+        ### Training from h5 files ###
         if self.all_demos is None:
             # use f-string to format index to be three digits with leading zeros
             episode_id = f'{self.episode_ids[index]:03d}'
-            dataset_path = os.path.join(self.dataset_dir, f'demo_{episode_id}.pkl')
-            with open(dataset_path, 'rb') as db:
-                root = pkl.load(db)
-                # data is not in the right format here we need to choose a not slow way to do this.
+            dataset_path = os.path.join(self.dataset_dir, f'demo_{episode_id}.h5')
+            root = h5py.File(dataset_path, 'r')
+
+            # get random timestep
+            episode_len = root['arm_action'].shape[0]
+            if sample_full_episode:
+                start_ts = 0
+            else:
+                start_ts = np.random.choice(episode_len)
+            action_len = episode_len - start_ts
+
+            # get image at start_ts
+            cam_image = preproc_imgs(root['rgb_frames'][start_ts: start_ts + 1], full_size_img=self.norm_stats['full_size_img'])
+
+            # get proprioception at start_ts
             if self.norm_stats['use_proprioception']:
-                qpos = get_proprioception(root, gripper_proprio=self.norm_stats['use_gripper_proprio'])
+                qpos = get_single_proprioception(
+                    root['gripper_state'][start_ts],
+                    root['eef_pose'][start_ts],
+                    root['eef_pos'][start_ts],
+                    gripper_proprio=self.norm_stats['use_gripper_proprio']
+                )
+            else:
+                qpos = torch.zeros(self.norm_stats['qpos_mean'].shape, device='cuda' if self.preload_to_gpu else "cpu")
 
-            data = {
-                "action": torch.from_numpy(get_action(root, self.norm_stats['absolute_actions'])).float(),
-                "camera": root['rgb_frames'],
-            }
+            # get action chunk
+            action = get_action_chunk(
+                root['eef_pos'][start_ts:],
+                root['eef_quat'][start_ts:],
+                root['arm_action'][start_ts:],
+                root['gripper_action'][start_ts:],
+                absolute=self.norm_stats['absolute_actions']
+            )
+
+            padded_action = torch.zeros_like(action)
+            padded_action[:action_len] = action
+            is_pad = torch.zeros(episode_len, device='cuda' if self.preload_to_gpu else "cpu", dtype=torch.bool)
+            is_pad[action_len:] = 1
+
+        ####################################
+        ### Training from preloaded data ###
         else:
+            # get data at index
             data = self.all_demos[index]
-        # breakpoint()
-        original_action_shape = data['action'].shape
-        episode_len = original_action_shape[0]
 
-        if sample_full_episode:
-            start_ts = 0
-        else:
-            start_ts = np.random.choice(episode_len)
+            # get random timestep
+            episode_len = data['action'].shape[0]
+            if sample_full_episode:
+                start_ts = 0
+            else:
+                start_ts = np.random.choice(episode_len)
+            action_len = episode_len - start_ts
 
-        # get all actions after and including start_ts
-        action_len = episode_len - start_ts
-        action = data['action'][start_ts:]
-        if self.all_demos is None:
-            cam_image = preproc_imgs(data['camera'][start_ts: start_ts + 1])
-        else:
+            # get image at start_ts
             cam_image = data['camera'][start_ts: start_ts + 1]
-        if self.norm_stats['use_proprioception']:
-            qpos = data['qpos'][start_ts].to(device='cuda' if self.preload_to_gpu else "cpu")
-        else:
-            qpos = torch.zeros(self.norm_stats['qpos_mean'].shape, device='cuda' if self.preload_to_gpu else "cpu")
 
-        padded_action = torch.zeros_like(data['action'])
-        padded_action[:action_len] = action
-        is_pad = torch.zeros(episode_len, device='cuda' if self.preload_to_gpu else "cpu", dtype=torch.bool)
-        is_pad[action_len:] = 1
+            # get proprioception at start_ts
+            if self.norm_stats['use_proprioception']:
+                qpos = data['qpos'][start_ts].to(device='cuda' if self.preload_to_gpu else "cpu")
+            else:
+                qpos = torch.zeros(self.norm_stats['qpos_mean'].shape, device='cuda' if self.preload_to_gpu else "cpu")
 
+            # get action chunk
+            action = data['action'][start_ts:]
+            padded_action = torch.zeros_like(data['action'])
+            padded_action[:action_len] = action
+            is_pad = torch.zeros(episode_len, device='cuda' if self.preload_to_gpu else "cpu", dtype=torch.bool)
+            is_pad[action_len:] = 1
+
+
+        # normalize data
         padded_action = (padded_action - self.norm_stats["action_mean"]) / self.norm_stats["action_std"]
         qpos = (qpos - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]
         # added this since the actions just get truncated by the model anyways
@@ -139,11 +174,11 @@ def get_norm_stats(
     all_action_data = []
     all_demos = []
     total_n = 0
-    listdir = [x for x in os.listdir(dataset_dir) if x.endswith('.pkl')]
+    listdir = [x for x in os.listdir(dataset_dir) if x.endswith('.h5')]
     for i, episode_path in enumerate(tqdm(listdir, desc='Loading data')):
         # dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
-        with open(os.path.join(dataset_dir, episode_path), 'rb') as dbfile:
-            root = pkl.load(dbfile)
+        # with open(os.path.join(dataset_dir, episode_path), 'rb') as dbfile:
+        root = h5py.File(os.path.join(dataset_dir, episode_path), 'r')
         qpos = get_proprioception(root, gripper_proprio=gripper_proprio)
         if not proprioception:
             qpos = np.zeros_like(qpos)
@@ -193,7 +228,7 @@ def get_norm_stats(
 
 def get_action(root, absolute=False):
     if absolute:
-        pos = root['eef_pos'].squeeze() + root['arm_action'][:, :3]
+        pos = root['eef_pos'][:].squeeze() + root['arm_action'][:, :3]
         quat_rot_actions = [axisangle2quat(x) for x in root['arm_action'][:, 3:]]
         rot = np.array([
             quat2axisangle(quat_multiply(i, j)) if quat2axisangle(quat_multiply(i, j))[0] > 0.0 else quat2axisangle(-quat_multiply(i, j)) for i,j in \
@@ -202,7 +237,23 @@ def get_action(root, absolute=False):
         arm_action = np.hstack((pos, rot))
     else:
         arm_action = root['arm_action']
-    action = np.hstack((arm_action, root['gripper_action'][:, None]))
+    action = np.hstack((arm_action, np.expand_dims(root['gripper_action'][:], axis=1)))
+    return action
+
+
+def get_action_chunk(eef_pos, eef_quat, arm_action, gripper_action, absolute=False):
+    if absolute:
+        pos = eef_pos.squeeze() + arm_action[:, :3]
+        quat_rot_actions = [axisangle2quat(x) for x in arm_action[:, 3:]]
+        rot = np.array([
+            quat2axisangle(quat_multiply(i, j)) if quat2axisangle(quat_multiply(i, j))[0] > 0.0 else quat2axisangle(-quat_multiply(i, j)) for i,j in \
+                zip(quat_rot_actions, eef_quat)
+                ])
+
+        arm_action = np.hstack((pos, rot))
+
+    action = np.hstack((arm_action, np.expand_dims(gripper_action, axis=1)))
+    action = torch.from_numpy(action).float()
     return action
 
 
@@ -234,17 +285,26 @@ def preproc_imgs(imgs, full_size_img=False):
 
 
 def get_proprioception(data, gripper_proprio=False):
-    if np.isclose(data['gripper_state'].max(), 0.04, atol=1e-2):
-        data['gripper_state'] *= 2
+    gripper = np.expand_dims(data['gripper_state'][:], 1)
+    if np.isclose(gripper.max(), 0.04, atol=1e-2):
+        gripper *= 2
     # NOTE 'eef_quat' is "current_quat" which is negated based on "target_quat". We want to use raw robot quats
     raw_quats = [mat2quat(x[:3, :3]) for x in data['eef_pose']]
     axis_angle = np.concatenate([[quat2axisangle(i)] if quat2axisangle(i)[0] > 0.0 else [quat2axisangle(-i)] for i in raw_quats])
-    gripper = data['gripper_state'][:, None]
+
     if not gripper_proprio:
         gripper = np.zeros_like(gripper)
-    qpos = np.hstack((data['eef_pos'].squeeze(), axis_angle, gripper))
+    eef_pos = data['eef_pos'][:]
+    qpos = np.hstack((eef_pos.squeeze(), axis_angle, gripper))
     return qpos
 
+def get_single_proprioception(gripper, eef_pose, eef_pos, gripper_proprio=False):
+    raw_quat = mat2quat(eef_pose[:3, :3])
+    axis_angle = [quat2axisangle(raw_quat)] if quat2axisangle(raw_quat)[0] > 0.0 else [quat2axisangle(-raw_quat)]
+    if not gripper_proprio:
+        gripper = np.zeros_like(gripper)
+    qpos = np.hstack((eef_pos, axis_angle, gripper))
+    return qpos
 
 def collate_fn(batch):
     image_data, qpos_data, action_data, is_pad = zip(*batch)
