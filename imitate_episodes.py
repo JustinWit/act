@@ -561,7 +561,7 @@ def train_bc(train_dataloader, real_train_dataloader, val_dataloader, config):
                     real_data_iter = iter(real_train_dataloader)
                     real_data = next(real_data_iter)
                 data = [torch.cat((data[i], real_data[i])) for i in range(len(data))]
-            # breakpoint()
+
             forward_dict = forward_pass(data, policy)
             # backward
             loss = forward_dict['loss']

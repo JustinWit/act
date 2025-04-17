@@ -114,8 +114,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
                 root['gripper_action'][start_ts:],
                 absolute=self.norm_stats['absolute_actions']
             )
-
-            padded_action = torch.zeros_like(action)
+            padded_action = torch.zeros((episode_len, action.shape[1]), device='cuda' if self.preload_to_gpu else "cpu")
             padded_action[:action_len] = action
             is_pad = torch.zeros(episode_len, device='cuda' if self.preload_to_gpu else "cpu", dtype=torch.bool)
             is_pad[action_len:] = 1
