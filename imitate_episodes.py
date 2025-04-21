@@ -146,7 +146,7 @@ def main(args):
     # create dataloader for real data
     if args['real_ratio'] > 0:
         real_dataset_dir = os.path.join("datasets", args['real_data_dir'])
-        real_num_episodes = len([x for x in os.listdir(real_dataset_dir) if x.endswith('.pkl')])
+        real_num_episodes = len([x for x in os.listdir(real_dataset_dir) if x.endswith('.h5')])
         real_train_dataloader, real_val_dataloader, real_stats, _ = load_data(
             real_dataset_dir,
             real_num_episodes,
