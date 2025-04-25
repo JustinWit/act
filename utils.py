@@ -268,7 +268,7 @@ def preproc_imgs(imgs, full_size_img=False):
     if imgs.shape[1] == 3:  # real data has 3 cams
         # imgs = imgs[:, 2]  # we only use the front cam
         imgs = imgs.squeeze()
-        assert imgs.shape[1:] == (720, 1280, 3)
+
         # imgs = imgs[:, :, 280: 1000]
         # # assert imgs.shape[1:] == (720, 720, 3)
         # if not full_size_img:
@@ -281,15 +281,16 @@ def preproc_imgs(imgs, full_size_img=False):
     #     imgs = imgs[:, 0]
     else:
         raise ValueError('Unknown camera shape')
-    # if full_size_img:
-    #     assert imgs.shape[1:] == (360, 360, 3)
-    # else:
-    #     assert imgs.shape[1:] == (256, 256, 3)
+    if full_size_img:
+        assert imgs.shape[1:] == (720, 1280, 3)
+    else:
+        # downsize to 640 x 360
+        imgs = np.stack([cv2.resize(imgs[i], (640, 360)) for i in range(imgs.shape[0])])
+        assert imgs.shape[1:] == (360, 640, 3)
     # convert bgr to rgb
     imgs = imgs[..., ::-1]
     imgs = torch.from_numpy(imgs.copy()).float() / 255.0
     imgs = torch.einsum('k h w c -> k c h w', imgs)
-    assert imgs.shape == (3, 3, 720, 1280), f"wrong image shape: {imgs.shape}"
     return imgs
 
 
