@@ -94,6 +94,7 @@ def main(args):
         'absolute_actions': args['absolute_actions'],
         'full_size_img': args['full_size_img'],
         'real_ratio': args['real_ratio'],
+        'precision': 'bfloat16' if args['bfloat16'] else 'float32',
     }
 
     if is_eval:
@@ -496,11 +497,12 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 #     return success_rate, avg_return
 
 
-def forward_pass(data, policy):
+def forward_pass(data, policy, precision):
     image_data, qpos_data, action_data, is_pad = data
-    image_data = image_data.to(torch.bfloat16)
-    qpos_data = qpos_data.to(torch.bfloat16)
-    action_data = action_data.to(torch.bfloat16)
+    if precision == 'bfloat16':
+        image_data = image_data.to(torch.bfloat16)
+        qpos_data = qpos_data.to(torch.bfloat16)
+        action_data = action_data.to(torch.bfloat16)
     image_data, qpos_data, action_data, is_pad = image_data.cuda(), qpos_data.cuda(), action_data.cuda(), is_pad.cuda()
 
     return policy(qpos_data, image_data, action_data, is_pad)
@@ -518,7 +520,8 @@ def train_bc(train_dataloader, real_train_dataloader, val_dataloader, config):
     policy = make_policy(policy_class, policy_config)
     policy.cuda()
     # convert to bflaot16
-    policy = policy.to(torch.bfloat16)
+    if config['precision'] == 'bfloat16':
+        policy = policy.to(torch.bfloat16)
     optimizer = make_optimizer(policy_class, policy)
 
     train_history = []
@@ -568,7 +571,7 @@ def train_bc(train_dataloader, real_train_dataloader, val_dataloader, config):
                     real_data = next(real_data_iter)
                 data = [torch.cat((data[i], real_data[i])) for i in range(len(data))]
 
-            forward_dict = forward_pass(data, policy)
+            forward_dict = forward_pass(data, policy, config['precision'])
             # backward
             loss = forward_dict['loss']
             loss.backward()
@@ -654,6 +657,7 @@ if __name__ == '__main__':
     parser.add_argument('--full_size_img', action='store_true')
     parser.add_argument('--real_ratio', action='store', type=float, help='proportion of real to sim', required=False, default=0)
     parser.add_argument('--real_data_dir', action='store', type=str, help='real_data_dir', required=False)
+    parser.add_argument('--bfloat16', action='store_true')
     args = vars(parser.parse_args())
     if args['gripper_proprio']:
         assert not args['no_proprioception']

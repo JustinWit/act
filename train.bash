@@ -11,6 +11,7 @@ python imitate_episodes.py \
 --absolute_actions \
 --full_size_img \
 --gripper_proprio \
+--bfloat16 \
 --no_wandb \
 # --no_proprioception \
 # --real_ratio 0.1 \
