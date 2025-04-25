@@ -46,7 +46,7 @@ def main(args):
     # else:
     # task_config = TASK_CONFIGS[task_name]
     # episode_len = task_config['episode_len']
-    camera_names = ['rgb_frames']
+    camera_names = ['side_cam', 'front_cam', 'overhead_cam']
 
     # fixed parameters
     state_dim = 7
@@ -108,7 +108,7 @@ def main(args):
 
     if log_wandb:
         wandb.init(
-            project='act-training',
+            project='RoCoDA-act-training',
             config=config,
             name=args['run_name'],
             entity="jwit3-georgia-institute-of-technology",
@@ -498,7 +498,11 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
 def forward_pass(data, policy):
     image_data, qpos_data, action_data, is_pad = data
+    image_data = image_data.to(torch.bfloat16)
+    qpos_data = qpos_data.to(torch.bfloat16)
+    action_data = action_data.to(torch.bfloat16)
     image_data, qpos_data, action_data, is_pad = image_data.cuda(), qpos_data.cuda(), action_data.cuda(), is_pad.cuda()
+
     return policy(qpos_data, image_data, action_data, is_pad)
 
 
@@ -513,6 +517,8 @@ def train_bc(train_dataloader, real_train_dataloader, val_dataloader, config):
 
     policy = make_policy(policy_class, policy_config)
     policy.cuda()
+    # convert to bflaot16
+    policy = policy.to(torch.bfloat16)
     optimizer = make_optimizer(policy_class, policy)
 
     train_history = []

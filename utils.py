@@ -93,7 +93,12 @@ class EpisodicDataset(torch.utils.data.Dataset):
             action_len = episode_len - start_ts
 
             # get image at start_ts
-            cam_image = preproc_imgs(root['rgb_frames'][start_ts: start_ts + 1], full_size_img=self.norm_stats['full_size_img'])
+            imgs = []
+            for cam in self.camera_names:
+                cam_img = root[f'rgb_frames/{cam}'][start_ts: start_ts + 1]
+                imgs.append(cam_img)
+            cam_image = np.concatenate(imgs, axis=0)
+            cam_image = preproc_imgs(np.expand_dims(cam_image, axis=0), full_size_img=self.norm_stats['full_size_img'])
 
             # get proprioception at start_ts
             if self.norm_stats['use_proprioception']:
@@ -103,6 +108,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
                     root['eef_pos'][start_ts],
                     gripper_proprio=self.norm_stats['use_gripper_proprio']
                 )
+                qpos = torch.from_numpy(qpos).to(device='cuda' if self.preload_to_gpu else "cpu", dtype=torch.float32)
             else:
                 qpos = torch.zeros(self.norm_stats['qpos_mean'].shape, device='cuda' if self.preload_to_gpu else "cpu")
 
@@ -121,6 +127,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
 
         ####################################
         ### Training from preloaded data ###
+        # TODO: set this up for rocoda data
         else:
             # get data at index
             data = self.all_demos[index]
@@ -257,29 +264,32 @@ def get_action_chunk(eef_pos, eef_quat, arm_action, gripper_action, absolute=Fal
 
 
 def preproc_imgs(imgs, full_size_img=False):
+    # TODO: Handle mid-def or downsize to 360
     if imgs.shape[1] == 3:  # real data has 3 cams
-        imgs = imgs[:, 2]  # we only use the front cam
-        assert imgs.shape[1:] == (360, 640, 3)
-        imgs = imgs[:, :, 140: 500]
-        assert imgs.shape[1:] == (360, 360, 3)
-        if not full_size_img:
-            # downsize to 256 x 256
-            resized_imgs = []
-            for i in range(imgs.shape[0]):
-                resized_imgs.append(cv2.resize(imgs[i], (256, 256)))
-            imgs = np.stack(resized_imgs, axis=0)
-    elif imgs.shape[1] == 1:  # sim data has one cam
-        imgs = imgs[:, 0]
+        # imgs = imgs[:, 2]  # we only use the front cam
+        imgs = imgs.squeeze()
+        assert imgs.shape[1:] == (720, 1280, 3)
+        # imgs = imgs[:, :, 280: 1000]
+        # # assert imgs.shape[1:] == (720, 720, 3)
+        # if not full_size_img:
+        #     # downsize to 256 x 256
+        #     resized_imgs = []
+        #     for i in range(imgs.shape[0]):
+        #         resized_imgs.append(cv2.resize(imgs[i], (256, 256)))
+        #     imgs = np.stack(resized_imgs, axis=0)
+    # elif imgs.shape[1] == 1:  # sim data has one cam
+    #     imgs = imgs[:, 0]
     else:
         raise ValueError('Unknown camera shape')
-    if full_size_img:
-        assert imgs.shape[1:] == (360, 360, 3)
-    else:
-        assert imgs.shape[1:] == (256, 256, 3)
+    # if full_size_img:
+    #     assert imgs.shape[1:] == (360, 360, 3)
+    # else:
+    #     assert imgs.shape[1:] == (256, 256, 3)
     # convert bgr to rgb
     imgs = imgs[..., ::-1]
     imgs = torch.from_numpy(imgs.copy()).float() / 255.0
     imgs = torch.einsum('k h w c -> k c h w', imgs)
+    assert imgs.shape == (3, 3, 720, 1280), f"wrong image shape: {imgs.shape}"
     return imgs
 
 
@@ -299,10 +309,10 @@ def get_proprioception(data, gripper_proprio=False):
 
 def get_single_proprioception(gripper, eef_pose, eef_pos, gripper_proprio=False):
     raw_quat = mat2quat(eef_pose[:3, :3])
-    axis_angle = [quat2axisangle(raw_quat)] if quat2axisangle(raw_quat)[0] > 0.0 else [quat2axisangle(-raw_quat)]
+    axis_angle = quat2axisangle(raw_quat) if quat2axisangle(raw_quat)[0] > 0.0 else quat2axisangle(-raw_quat)
     if not gripper_proprio:
         gripper = np.zeros_like(gripper)
-    qpos = np.hstack((eef_pos, axis_angle, gripper))
+    qpos = np.hstack((eef_pos.squeeze(), axis_angle, gripper))
     return qpos
 
 def collate_fn(batch):
