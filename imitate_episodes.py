@@ -283,7 +283,17 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
 
     # Configure Camera Stream
-    image_subscriber = ZMQCameraSubscriber(
+    side_image_subscriber = ZMQCameraSubscriber(
+            host = "143.215.128.151",
+            port = "10005",  # 5 - size, 6 - front, 7 - overhead
+            topic_type = 'RGB'
+        )
+    front_image_subscriber = ZMQCameraSubscriber(
+            host = "143.215.128.151",
+            port = "10006",  # 5 - top, 6 - side, 7 - front
+            topic_type = 'RGB'
+        )
+    overhead_image_subscriber = ZMQCameraSubscriber(
             host = "143.215.128.151",
             port = "10007",  # 5 - top, 6 - side, 7 - front
             topic_type = 'RGB'
@@ -330,7 +340,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    max_timesteps = int(152) # may increase for real-world tasks
+    max_timesteps = int(250) # may increase for real-world tasks
 
     num_rollouts = 1
 #     episode_returns = []
@@ -375,18 +385,22 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 #                     plt.pause(DT)
 
                 ### process previous timestep to get qpos and image_list
-                frames = image_subscriber.recv_rgb_image()
-                color_frame = frames[0]
-                if color_frame is None:
+                side_frames = side_image_subscriber.recv_rgb_image()
+                front_frames = front_image_subscriber.recv_rgb_image()
+                overhead_frames = overhead_image_subscriber.recv_rgb_image()
+                frames = [side_frames[0], front_frames[0], overhead_frames[0]]
+
+                if np.any(frames is None):
                     continue
 
-                # process and store image
-                assert color_frame.shape == (360, 640, 3)
-                color_frame = color_frame[:, 140:500]  # center crop 360x360
-                if not config['full_size_img']:
-                    color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
-                color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB
+                # color_frame = color_frame[:, 140:500]  # center crop 360x360
+                for i, f in enumerate(frames):
+                    assert f.shape == (720, 1280, 3), f"Image {i} shape {f.shape} is not correct"
+                    if not config['full_size_img']:
+                        f = cv2.resize(f, (640, 360))
+                    frames[i] = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
                 # image_list.append(color_frame)
+                frames = np.stack(frames)
 
                 if proprioception:
                     quat, pos = robot_interface.last_eef_quat_and_pos
@@ -404,7 +418,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                     qpos = np.zeros(7)
                 qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
                 qpos_history[:, t] = qpos
-                curr_image = torch.from_numpy(color_frame / 255.).unsqueeze(0).float().cuda()
+                curr_image = torch.from_numpy(frames / 255.).float().cuda()
                 curr_image = torch.einsum('k h w c -> k c h w', curr_image).unsqueeze(0)
 
                 ### query policy
@@ -448,7 +462,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
 
                 # Display the image Press 'q' to exit
-                cv2.imshow("Camera", cv2.cvtColor(color_frame, cv2.COLOR_RGB2BGR))  # convert back to BGR for cv2
+                cv2.imshow("Camera", cv2.cvtColor(np.hstack(frames), cv2.COLOR_RGB2BGR))  # convert back to BGR for cv2
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
