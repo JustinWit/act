@@ -95,6 +95,7 @@ def main(args):
         'full_size_img': args['full_size_img'],
         'real_ratio': args['real_ratio'],
         'precision': 'bfloat16' if args['bfloat16'] else 'float32',
+        'crop_resize': args['crop_resize'],
     }
 
     if is_eval:
@@ -142,6 +143,7 @@ def main(args):
         gripper_proprio=args['gripper_proprio'],
         absolute_actions=args['absolute_actions'],
         full_size_img=args['full_size_img'],
+        crop_resize=args['crop_resize'],
         )
     # breakpoint()
     # create dataloader for real data
@@ -340,7 +342,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    max_timesteps = int(250) # may increase for real-world tasks
+    max_timesteps = int(1000) # may increase for real-world tasks
 
     num_rollouts = 1
 #     episode_returns = []
@@ -671,7 +673,9 @@ if __name__ == '__main__':
     parser.add_argument('--full_size_img', action='store_true')
     parser.add_argument('--real_ratio', action='store', type=float, help='proportion of real to sim', required=False, default=0)
     parser.add_argument('--real_data_dir', action='store', type=str, help='real_data_dir', required=False)
-    parser.add_argument('--bfloat16', action='store_true')
+    parser.add_argument('--bfloat16', action='store_true', required=False)
+    parser.add_argument('--crop_resize', action='store_true', required=False)
+
     args = vars(parser.parse_args())
     if args['gripper_proprio']:
         assert not args['no_proprioception']

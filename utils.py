@@ -9,6 +9,7 @@ from tqdm import tqdm
 import cv2
 from deoxys_transform_utils import quat2axisangle, axisangle2quat, quat_multiply, mat2quat
 import h5py
+from torchvision.transforms import v2
 # from scipy.spatial.transform import Rotation as R
 
 import IPython
@@ -25,6 +26,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
             all_demos=None,
             preload_to_cpu=False,
             preload_to_gpu=False,
+            crop_resize=False,
             ):
         super(EpisodicDataset).__init__()
         self.episode_ids = episode_ids
@@ -32,6 +34,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
         self.preload_to_gpu = preload_to_gpu
         self.camera_names = camera_names
         self.norm_stats = norm_stats
+        self.crop_resize = crop_resize
         # convert to tensor and move to gpu
         for k, v in self.norm_stats.items():
             if isinstance(v, np.ndarray):
@@ -43,6 +46,11 @@ class EpisodicDataset(torch.utils.data.Dataset):
         self.is_sim = False
         self.chunk_size = chunk_size
         self.all_demos = all_demos
+
+        self.img_transform = v2.Compose([
+            v2.RandomResizedCrop(size=(720, 1280) if self.norm_stats['full_size_img'] else (360, 640), scale=(0.8, 1.0)),
+        ])
+
 
     def set_norm_stats(self, norm_stats):
         self.norm_stats = norm_stats
@@ -99,6 +107,8 @@ class EpisodicDataset(torch.utils.data.Dataset):
                 imgs.append(cam_img)
             cam_image = np.concatenate(imgs, axis=0)
             cam_image = preproc_imgs(np.expand_dims(cam_image, axis=0), full_size_img=self.norm_stats['full_size_img'])
+            if self.crop_resize:
+                cam_image = self.img_transform(cam_image)
 
             # get proprioception at start_ts
             if self.norm_stats['use_proprioception']:
@@ -341,6 +351,7 @@ def load_data(
     gripper_proprio=False,
     absolute_actions=False,
     full_size_img=False,
+    crop_resize=False,
     ):
 
     print(f'\nData from: {dataset_dir}\n')
@@ -372,6 +383,7 @@ def load_data(
         all_demos=all_demos,
         preload_to_cpu=preload_to_cpu,
         preload_to_gpu=preload_to_gpu,
+        crop_resize=crop_resize,
         )
     # val_dataset = EpisodicDataset(
     #     val_indices,
