@@ -11,8 +11,8 @@ python imitate_episodes.py \
 --absolute_actions \
 --full_size_img \
 --no_proprioception \
---real_ratio 0.1 \
---real_data_dir real_pick_coke \
-# --no_wandb \
+--no_wandb \
+# --real_ratio 0.1 \
+# --real_data_dir real_pick_coke \
 # --preload_to_gpu \
 # --gripper_proprio \

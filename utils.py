@@ -257,11 +257,12 @@ def get_action_chunk(eef_pos, eef_quat, arm_action, gripper_action, absolute=Fal
 
 
 def preproc_imgs(imgs, full_size_img=False):
+    # breakpoint()
     if imgs.shape[1] == 3:  # real data has 3 cams
-        imgs = imgs[:, 2]  # we only use the front cam
+        imgs = imgs[:, 1:].squeeze(0)  # Use wrist and front cam
         assert imgs.shape[1:] == (360, 640, 3)
-        imgs = imgs[:, :, 140: 500]
-        assert imgs.shape[1:] == (360, 360, 3)
+        # imgs = imgs[:, :, 140: 500]  # NOTE: NOT CROPPING FOR TESTS WITH WRIST CAM
+        # assert imgs.shape[1:] == (360, 360, 3)
         if not full_size_img:
             # downsize to 256 x 256
             resized_imgs = []
@@ -272,10 +273,10 @@ def preproc_imgs(imgs, full_size_img=False):
         imgs = imgs[:, 0]
     else:
         raise ValueError('Unknown camera shape')
-    if full_size_img:
-        assert imgs.shape[1:] == (360, 360, 3)
-    else:
-        assert imgs.shape[1:] == (256, 256, 3)
+    # if full_size_img:
+    #     assert imgs.shape[1:] == (360, 360, 3)
+    # else:
+    #     assert imgs.shape[1:] == (256, 256, 3)
     # convert bgr to rgb
     imgs = imgs[..., ::-1]
     imgs = torch.from_numpy(imgs.copy()).float() / 255.0
