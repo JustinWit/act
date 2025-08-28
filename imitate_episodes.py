@@ -46,7 +46,7 @@ def main(args):
     # else:
     # task_config = TASK_CONFIGS[task_name]
     # episode_len = task_config['episode_len']
-    camera_names = ['rgb_frames']
+    camera_names = ['wrist_camera', 'front_camera']
 
     # fixed parameters
     state_dim = 7

@@ -196,6 +196,7 @@ def get_norm_stats(
         all_qpos_data.append(torch.from_numpy(qpos))
         all_action_data.append(torch.from_numpy(action))
         if preload_to_cpu or preload_to_gpu:
+            raise NotImplementedError("Need to fix this for multiple cameras inputs w/ batch dimension. Also need to vectorize the preprocessing (don't use cv2 for resizing.)")
             all_demos.append({
                 "qpos": torch.from_numpy(qpos).float(),
                 "action": torch.from_numpy(action).float(),
