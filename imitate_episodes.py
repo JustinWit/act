@@ -10,7 +10,7 @@ from einops import rearrange
 
 from constants import DT
 from constants import PUPPET_GRIPPER_JOINT_OPEN
-from utils import load_data # data functions
+from utils import load_data, preproc_imgs # data functions
 from utils import sample_box_pose, sample_insertion_pose # robot functions
 from utils import compute_dict_mean, set_seed, detach_dict, combined_std # helper functions
 from policy import ACTPolicy, CNNMLPPolicy
@@ -335,7 +335,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    max_timesteps = int(150) # may increase for real-world tasks
+    max_timesteps = int(200) # may increase for real-world tasks, TODO
 
     num_rollouts = 1
 #     episode_returns = []
@@ -384,18 +384,18 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 wrist_frames = wrist_subscriber.recv_rgb_image()
                 if over_frames[0] is None:
                     continue
-                # breakpoint()
-                color_frame = np.stack([wrist_frames[0], over_frames[0]], axis=0)  # shape: (2, 360, 640, 3)
 
+                # add dummy camera image to match the training data to use the same image preprocessing function
+                color_frames = np.stack([
+                    np.zeros_like(wrist_frames[0]),  # dummy
+                    wrist_frames[0],
+                    over_frames[0]
+                    ], axis=0)  # shape: (3, 360, 640, 3)
 
-                # process and store image
-                assert color_frame.shape == (2, 360, 640, 3)
-                # color_frame = color_frame[:, :, 140:500]  # center crop 360x360
-                # if not config['full_size_img']:
-                #     color_frame = cv2.resize(color_frame, (256, 256))  # resize for image processor
-                # color_frame = cv2.cvtColor(color_frame, cv2.COLOR_BGR2RGB)  # convert to RGB
-                color_frame = color_frame[:, :, :, [2, 1, 0]]  # swap B and R channel
-                # image_list.append(color_frame)
+                curr_image = preproc_imgs(
+                    color_frames.unsqueeze(0), # (1, 3, H, W, 3)
+                    full_size_img=config['full_size_img'],
+                    ).cuda()
 
                 if proprioception:
                     quat, pos = robot_interface.last_eef_quat_and_pos
@@ -413,8 +413,6 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                     qpos = np.zeros(7)
                 qpos = torch.from_numpy(qpos).float().cuda().unsqueeze(0)
                 qpos_history[:, t] = qpos
-                curr_image = torch.from_numpy(color_frame / 255.).float().cuda()
-                curr_image = torch.einsum('k h w c -> k c h w', curr_image).unsqueeze(0)
 
                 ### query policy
                 if config['policy_class'] == "ACT":
@@ -457,7 +455,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
 
                 # Display the image Press 'q' to exit
-                cv2.imshow("Camera", cv2.cvtColor(np.hstack((color_frame[1], color_frame[0])), cv2.COLOR_RGB2BGR))  # convert back to BGR for cv2
+                cv2.imshow("Camera", cv2.cvtColor(np.hstack((color_frame[1], color_frame[0])), cv2.COLOR_RGB2BGR))
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 

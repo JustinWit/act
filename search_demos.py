@@ -1,7 +1,7 @@
 import os
 import cv2
 import numpy as np
-from skimage.metrics import structural_similarity as ssim
+# from skimage.metrics import structural_similarity as ssim
 import argparse
 from openteach.utils.network import ZMQCameraSubscriber
 import matplotlib.pyplot as plt

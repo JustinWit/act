@@ -9,10 +9,10 @@ python imitate_episodes.py \
 --seed 0 \
 --run_name $2 \
 --absolute_actions \
---full_size_img \
 --no_proprioception \
 --no_wandb \
+# --preload_to_gpu \
+# --full_size_img \
 # --real_ratio 0.1 \
 # --real_data_dir real_pick_coke \
-# --preload_to_gpu \
 # --gripper_proprio \

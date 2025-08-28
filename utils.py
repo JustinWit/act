@@ -12,6 +12,7 @@ import h5py
 # from scipy.spatial.transform import Rotation as R
 
 import IPython
+import glob
 e = IPython.embed
 
 
@@ -53,6 +54,17 @@ class EpisodicDataset(torch.utils.data.Dataset):
                 if self.preload_to_gpu:
                     self.norm_stats[k] = self.norm_stats[k].cuda()
 
+    def get_dataset_path(self, episode_id):
+        pattern = os.path.join(self.dataset_dir, f"demo_*_{episode_id}.h5")
+        matches = glob.glob(pattern)
+
+        if len(matches) == 0:
+            raise FileNotFoundError(f"No file found matching {pattern}")
+        elif len(matches) > 1:
+            raise RuntimeError(f"Multiple matches found: {matches}")
+        else:
+            return matches[0]
+
     def __len__(self):
         return len(self.episode_ids)
 
@@ -81,8 +93,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
         if self.all_demos is None:
             # use f-string to format index to be three digits with leading zeros
             episode_id = f'{self.episode_ids[index]:03d}'
-            dataset_path = os.path.join(self.dataset_dir, f'demo_{episode_id}.h5')
-            root = h5py.File(dataset_path, 'r')
+            root = h5py.File(self.get_dataset_path(episode_id), 'r')
 
             # get random timestep
             episode_len = root['arm_action'].shape[0]
@@ -257,12 +268,19 @@ def get_action_chunk(eef_pos, eef_quat, arm_action, gripper_action, absolute=Fal
 
 
 def preproc_imgs(imgs, full_size_img=False):
-    # breakpoint()
+    # just had gotten rid of the batch dimension here. Why? The batch size is one.
+    """
+    Takes numpy array with shape (batch, num_cams, h, w, c)
+    Outputs torch tensor with shape (final_num_cams, c, h, w)
+
+    TODO: What is the effect of making the batch dim 2 instead of 1?
+    """
+    assert not full_size_img, "We do not use 360x360 images anymore"
+    assert imgs.shape[0] == 1
     if imgs.shape[1] == 3:  # real data has 3 cams
-        imgs = imgs[:, 1:].squeeze(0)  # Use wrist and front cam
-        assert imgs.shape[1:] == (360, 640, 3)
-        # imgs = imgs[:, :, 140: 500]  # NOTE: NOT CROPPING FOR TESTS WITH WRIST CAM
-        # assert imgs.shape[1:] == (360, 360, 3)
+        imgs = imgs[0, 1:]  # Use wrist and front cam
+        imgs = imgs[:, :, 140: 500]
+        assert imgs.shape == (2, 360, 360, 3)
         if not full_size_img:
             # downsize to 256 x 256
             resized_imgs = []
@@ -270,13 +288,14 @@ def preproc_imgs(imgs, full_size_img=False):
                 resized_imgs.append(cv2.resize(imgs[i], (256, 256)))
             imgs = np.stack(resized_imgs, axis=0)
     elif imgs.shape[1] == 1:  # sim data has one cam
+        raise NotImplementedError("TODO: need to add wrist camera to sim data generation")
         imgs = imgs[:, 0]
     else:
         raise ValueError('Unknown camera shape')
-    # if full_size_img:
-    #     assert imgs.shape[1:] == (360, 360, 3)
-    # else:
-    #     assert imgs.shape[1:] == (256, 256, 3)
+    if full_size_img:
+        assert imgs.shape == (2, 360, 360, 3)
+    else:
+        assert imgs.shape == (2, 256, 256, 3)
     # convert bgr to rgb
     imgs = imgs[..., ::-1]
     imgs = torch.from_numpy(imgs.copy()).float() / 255.0
