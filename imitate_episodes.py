@@ -455,7 +455,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
 
                 # Display the image Press 'q' to exit
-                cv2.imshow("Camera", cv2.cvtColor(np.hstack((color_frame[1], color_frame[0])), cv2.COLOR_RGB2BGR))
+                cv2.imshow("Camera", cv2.cvtColor(np.hstack((color_frames[1], color_frames[0])), cv2.COLOR_RGB2BGR))
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
