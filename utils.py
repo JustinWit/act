@@ -12,7 +12,6 @@ import h5py
 # from scipy.spatial.transform import Rotation as R
 
 import IPython
-import glob
 e = IPython.embed
 
 
@@ -30,6 +29,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
         super(EpisodicDataset).__init__()
         self.episode_ids = episode_ids
         self.dataset_dir = dataset_dir
+        self.demo_names = sorted([x for x in os.listdir(dataset_dir) if x.endswith('.h5')])
         self.preload_to_gpu = preload_to_gpu
         self.camera_names = camera_names
         self.norm_stats = norm_stats
@@ -54,16 +54,8 @@ class EpisodicDataset(torch.utils.data.Dataset):
                 if self.preload_to_gpu:
                     self.norm_stats[k] = self.norm_stats[k].cuda()
 
-    def get_dataset_path(self, episode_id):
-        pattern = os.path.join(self.dataset_dir, f"demo_*_{episode_id}.h5")
-        matches = glob.glob(pattern)
-
-        if len(matches) == 0:
-            raise FileNotFoundError(f"No file found matching {pattern}")
-        elif len(matches) > 1:
-            raise RuntimeError(f"Multiple matches found: {matches}")
-        else:
-            return matches[0]
+    def get_demo_path(self, index):
+        return os.path.join(self.dataset_dir, self.demo_names[self.episode_ids[index]])
 
     def __len__(self):
         return len(self.episode_ids)
@@ -92,8 +84,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
         ### Training from h5 files ###
         if self.all_demos is None:
             # use f-string to format index to be three digits with leading zeros
-            episode_id = f'{self.episode_ids[index]:03d}'
-            root = h5py.File(self.get_dataset_path(episode_id), 'r')
+            root = h5py.File(self.get_demo_path(index), 'r')
 
             # get random timestep
             episode_len = root['arm_action'].shape[0]
@@ -358,7 +349,7 @@ def load_data(
     train_ratio = 1.0
     shuffled_indices = np.random.permutation(num_episodes)
     train_indices = shuffled_indices[:int(train_ratio * num_episodes)]
-    val_indices = shuffled_indices[int(train_ratio * num_episodes):]
+    # val_indices = shuffled_indices[int(train_ratio * num_episodes):]
 
     # obtain normalization stats for qpos and action
     norm_stats, all_demos = get_norm_stats(
