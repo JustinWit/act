@@ -154,7 +154,7 @@ class EpisodicDataset(torch.utils.data.Dataset):
 
         # normalize data
         padded_action = (padded_action - self.norm_stats["action_mean"]) / self.norm_stats["action_std"]
-        qpos = (qpos - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]
+        qpos = ((qpos - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]).float()
         # added this since the actions just get truncated by the model anyways
         padded_action = padded_action[:self.chunk_size]
         is_pad = is_pad[:self.chunk_size]
@@ -314,7 +314,7 @@ def get_single_proprioception(gripper, eef_pose, eef_pos, gripper_proprio=False)
     axis_angle = [quat2axisangle(raw_quat)] if quat2axisangle(raw_quat)[0] > 0.0 else [quat2axisangle(-raw_quat)]
     if not gripper_proprio:
         gripper = np.zeros_like(gripper)
-    qpos = np.hstack((eef_pos, axis_angle, gripper))
+    qpos = torch.tensor(np.hstack((eef_pos.squeeze(), axis_angle[0], gripper)))
     return qpos
 
 def collate_fn(batch):
