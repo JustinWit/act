@@ -335,7 +335,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    max_timesteps = int(200) # may increase for real-world tasks, TODO
+    max_timesteps = int(500) # may increase for real-world tasks, TODO
 
     num_rollouts = 1
 #     episode_returns = []
@@ -393,9 +393,10 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                     ], axis=0)  # shape: (3, 360, 640, 3)
 
                 curr_image = preproc_imgs(
-                    color_frames.unsqueeze(0), # (1, 3, H, W, 3)
+                    color_frames[np.newaxis, ...], # (1, 3, H, W, 3)
                     full_size_img=config['full_size_img'],
-                    ).cuda()
+                    ).cuda()  # output is shape (2, 3, H, W)
+                curr_image = curr_image.unsqueeze(0)  # (1, 2, 3, H, W) need to add batch dim. During training, this is done in the dataloader
 
                 if proprioception:
                     quat, pos = robot_interface.last_eef_quat_and_pos
@@ -444,7 +445,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 # action[3:6] = quat2axisangle(mat2quat(euler2mat(action[3:6])))  # convert euler to axis-angle
                 # action = normalize_gripper_action(action, binarize=True)  # normalize gripper action
                 action[-1] = 1 if action[-1] > 0 else -1  # binarize gripper action
-                print(action)
+                print(t, action)
 
                 robot_interface.control(
                     controller_type='OSC_POSE',
@@ -454,8 +455,11 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 robot_interface.gripper_control(action[-1])
 
 
+                curr_image_np = curr_image[0].cpu().numpy() # shape (2, 3, H, W)
+                curr_image_np = np.transpose(curr_image_np, (0, 2, 3, 1))
+
                 # Display the image Press 'q' to exit
-                cv2.imshow("Camera", cv2.cvtColor(np.hstack((color_frames[1], color_frames[0])), cv2.COLOR_RGB2BGR))
+                cv2.imshow("Camera", cv2.cvtColor(np.hstack((curr_image_np[0], curr_image_np[1])), cv2.COLOR_RGB2BGR))
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 

@@ -10,7 +10,7 @@ python imitate_episodes.py \
 --seed 0 \
 --ckpt_name $2 \
 --run_name eval \
---no_proprioception \
---full_size_img \
 --absolute_actions \
---temporal_agg \
+--no_proprioception \
+# --temporal_agg \
+# --full_size_img \
