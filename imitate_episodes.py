@@ -363,9 +363,9 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
         qpos_history = torch.zeros((1, max_timesteps, state_dim)).cuda()
         # image_list = [] # for visualization
-        video_recorder_side = RecordEval(ckpt_name, 10005)
-        video_recorder_wrist = RecordEval(ckpt_name, 10006)
-        video_recorder_front = RecordEval(ckpt_name, 10007)
+        video_recorder_side = RecordEval(ckpt_name, 10005, name_suffix=args['vid_name'])
+        video_recorder_wrist = RecordEval(ckpt_name, 10006, name_suffix=args['vid_name'])
+        video_recorder_front = RecordEval(ckpt_name, 10007, name_suffix=args['vid_name'])
         video_recorder_side.start()
         video_recorder_wrist.start()
         video_recorder_front.start()
@@ -661,6 +661,7 @@ if __name__ == '__main__':
     parser.add_argument('--preload_to_gpu', action='store_true')
     parser.add_argument('--gripper_proprio', action='store_true')
     parser.add_argument('--absolute_actions', action='store_true')
+    parser.add_argument('--vid_name', type=str, help='video name for eval', required=False, default='')
     parser.add_argument('--full_size_img', action='store_true')
     parser.add_argument('--real_ratio', action='store', type=float, help='proportion of real to sim', required=False, default=0)
     parser.add_argument('--real_data_dir', action='store', type=str, help='real_data_dir', required=False)

@@ -6,10 +6,13 @@ import datetime
 import os
 
 class RecordEval():
-    def __init__(self, ckpt_name, port_num):
+    def __init__(self, ckpt_name, port_num, name_suffix=''):
         self.image_list = []
         self.record = False
         self.ckpt_name = ckpt_name.split('.')[0]
+        self.name_suffix = name_suffix
+        if self.name_suffix == 'default':
+            self.name_suffix = ''
         self.image_subscriber = ZMQCameraSubscriber(
                                     host = "143.215.128.151",
                                     port = port_num,  # 5 - top, 6 - side, 7 - front
@@ -37,7 +40,11 @@ class RecordEval():
         self.record_thread.join()
         if not os.path.exists(root_path):
             os.makedirs(root_path)
-        filename = f'{datetime.datetime.now().strftime(f"{self.ckpt_name}_%Y-%m-%d_%H-%M-%S")}.mp4'
+        filename = f'{datetime.datetime.now().strftime(f"{self.ckpt_name}_%Y-%m-%d_%H-%M-%S")}'
+        if self.name_suffix:
+            filename += f"_{self.name_suffix}.mp4"
+        else:
+            filename += ".mp4"
         save_path = os.path.join('.', root_path, filename)
         out = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), 30, self.image_list[0].shape[:2][::-1])
         print(len(self.image_list))

@@ -2,8 +2,11 @@
 # TODO add option to set query_frequency and controller temporal frequency
 set -ex
 
+VID_NAME=${3:-"default"}  # optional argument for video name suffix
+
 python imitate_episodes.py \
 --eval \
+--vid_name $VID_NAME \
 --ckpt_dir act_models/$1 \
 --policy_class ACT --kl_weight 10 --chunk_size 10 --hidden_dim 512 --batch_size 128 --dim_feedforward 3200 \
 --num_epochs 20000 --lr 1e-4 \
