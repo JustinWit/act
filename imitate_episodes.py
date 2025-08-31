@@ -335,12 +335,12 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    max_timesteps = int(500) # may increase for real-world tasks, TODO
+    max_timesteps = int(400) # may increase for real-world tasks, TODO
 
-    num_rollouts = 1
+    # num_rollouts = 1
 #     episode_returns = []
 #     highest_rewards = []
-    for rollout_id in range(num_rollouts):
+    # for rollout_id in range(num_rollouts):
 #         rollout_id += 0
 #         ### set task
 #         if 'sim_transfer_cube' in task_name:
@@ -357,17 +357,18 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 #             plt.ion()
 
         ### evaluation loop
+    try:
         if temporal_agg:
             all_time_actions = torch.zeros([max_timesteps, max_timesteps+num_queries, state_dim]).cuda()
 
         qpos_history = torch.zeros((1, max_timesteps, state_dim)).cuda()
         # image_list = [] # for visualization
-        video_recorder_hd = RecordEval(ckpt_name, 10005)
-        video_recorder_overview = RecordEval(ckpt_name, 10006)
-        video_recorder_pov = RecordEval(ckpt_name, 10007)
-        video_recorder_hd.start()
-        video_recorder_overview.start()
-        video_recorder_pov.start()
+        video_recorder_side = RecordEval(ckpt_name, 10005)
+        video_recorder_wrist = RecordEval(ckpt_name, 10006)
+        video_recorder_front = RecordEval(ckpt_name, 10007)
+        video_recorder_side.start()
+        video_recorder_wrist.start()
+        video_recorder_front.start()
         # qpos_list = []
         # target_qpos_list = []
         # rewards = []
@@ -468,10 +469,13 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 # qpos_list.append(qpos_numpy)
                 # target_qpos_list.append(target_qpos)
                 # rewards.append(ts.reward)
-
-        video_recorder_hd.stop(os.path.join(ckpt_dir, 'videos_hd'))
-        video_recorder_pov.stop(os.path.join(ckpt_dir, 'videos_pov'))
-        video_recorder_overview.stop(os.path.join(ckpt_dir, 'videos_overview'))
+    except KeyboardInterrupt:
+        print("KeyboardInterrupt, stopping early and saving video...")
+    finally:
+        video_recorder_side.stop(os.path.join(ckpt_dir, 'videos_side'))
+        video_recorder_front.stop(os.path.join(ckpt_dir, 'videos_front'))
+        video_recorder_wrist.stop(os.path.join(ckpt_dir, 'videos_wrist'))
+        cv2.destroyAllWindows()
 
 #             plt.close()
         # if real_robot:
