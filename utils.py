@@ -269,8 +269,13 @@ def preproc_imgs(imgs, full_size_img=False):
     """
     assert not full_size_img, "We do not use 360x360 images anymore"
     assert imgs.shape[0] == 1
-    if imgs.shape[1] == 3:  # real data has 3 cams
-        imgs = imgs[0, 1:]  # Use wrist and front cam
+    assert imgs.shape[1] == 3
+
+    imgs = imgs[0, 1:]  # Use wrist and front cam
+    if imgs.shape[1] == 256:
+        assert imgs.shape == (2, 256, 256, 3)
+    else:
+        assert imgs.shape == (2, 360, 640, 3)
         imgs = imgs[:, :, 140: 500]
         assert imgs.shape == (2, 360, 360, 3)
         if not full_size_img:
@@ -279,11 +284,7 @@ def preproc_imgs(imgs, full_size_img=False):
             for i in range(imgs.shape[0]):
                 resized_imgs.append(cv2.resize(imgs[i], (256, 256)))
             imgs = np.stack(resized_imgs, axis=0)
-    elif imgs.shape[1] == 1:  # sim data has one cam
-        raise NotImplementedError("TODO: need to add wrist camera to sim data generation")
-        imgs = imgs[:, 0]
-    else:
-        raise ValueError('Unknown camera shape')
+
     if full_size_img:
         assert imgs.shape == (2, 360, 360, 3)
     else:
