@@ -5,34 +5,31 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-pkl_dir = "/data3/extracted_data/close_laptop_100/demos"
-pkl_dir2 = "datasets/super_slow_arm"
-max_demo_len = []
-max_demo_len2 = []
-for i in tqdm(range(100)):
-    # format like 000, 001, 002, etc
-    pkl_path = os.path.join(pkl_dir, f"demo_{i:03d}.pkl")
-    with open(pkl_path, 'rb') as f:
-        data = pkl.load(f)
-    max_demo_len.append( len(data['arm_action']))
-# for i in tqdm(range(100)):
-#     # format like 000, 001, 002, etc
-#     pkl_path2 = os.path.join(pkl_dir2, f"demo_{i:03d}.pkl")
-#     with open(pkl_path2, 'rb') as f:
-#         data2 = pkl.load(f)
-#     max_demo_len2.append(data2['arm_action'])
-
-    # demo_len2 = data2['arm_action'].shape[0]
-    # max_demo_len = max(max_demo_len, demo_len)
-    # max_demo_len2 = max(max_demo_len2, demo_len2)
-
-# mean1 = np.std(np.concatenate(max_demo_len), axis=0)
-# mean2 = np.std(np.concatenate(max_demo_len2), axis=0)
-breakpoint()
-#print(f"mean demo sim: {np.mean(np.concatenate(max_demo_len), axis=0)}")
-#print(f"mean demo real: {np.mean(np.concatenate(max_demo_len2), axis=0)}")
-
-    # plt.imshow(data['rgb_frames'][0][0])
+pkl_dirs = [
+    "/data3/extracted_data/close_laptop_100/demos",
+]
+stem = '/data3/rlbench_demos/icra_resubmission/converted'
+pkl_dirs = [os.path.join(stem, x) for x in os.listdir(stem)]
+for pkl_dir in pkl_dirs:
+    demo_lens = []
+    for pkl_file in [x for x in os.listdir(pkl_dir) if x.endswith('.pkl')]:
+        print(pkl_file)
+        pkl_path = os.path.join(pkl_dir, pkl_file)
+        with open(pkl_path, 'rb') as f:
+            data = pkl.load(f)
+        demo_lens.append( len(data['arm_action']))
+    print(f"Max demo len: {max(demo_lens)}, Min demo len: {min(demo_lens)}, Mean demo len: {np.mean(demo_lens)}")
+    # print the max, min, mean demo lengths on plot somewhere
+    plt.hist(demo_lens, bins=30)
+    plt.title(pkl_dir)
+    plt.xlabel('Demo Length')
+    plt.ylabel('Count')
+    plt.axvline(x=max(demo_lens), color='r', linestyle='--', label=f'Max: {max(demo_lens)}')
+    plt.axvline(x=min(demo_lens), color='g', linestyle='--', label=f'Min: {min(demo_lens)}')
+    plt.axvline(x=np.mean(demo_lens), color='b', linestyle='--', label=f'Mean: {np.mean(demo_lens):.2f}')
+    plt.legend()
+    # save the plot to disk
+    plt.savefig(f'{pkl_dir.replace("/", "_")}_demo_lens_hist.png')
+    plt.clf()
+    plt.close()
     # plt.show()
-
-# print(max_demo_len)
