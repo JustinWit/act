@@ -14,7 +14,8 @@ class RecordEval():
         if self.name_suffix == 'default':
             self.name_suffix = ''
         self.image_subscriber = ZMQCameraSubscriber(
-                                    host = "143.215.128.151",
+                                    # host = "143.215.128.151",
+                                    host="172.16.0.1",
                                     port = port_num,  # 5 - top, 6 - side, 7 - front
                                     topic_type = 'RGB'
                                 )

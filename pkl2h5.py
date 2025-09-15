@@ -21,6 +21,7 @@ def convert_pkl_to_h5(pkl_file):
     with h5py.File(h5_file, 'w') as h5f:
         # create array of all keys lister
         keys = ['rgb_frames', 'eef_pos', 'eef_quat', 'arm_action', 'gripper_action', 'gripper_state', 'eef_pose']
+        print(data.keys(), h5_file)
         for key in keys:
             h5f.create_dataset(key, data=data[key])
 

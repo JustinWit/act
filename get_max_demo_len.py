@@ -6,10 +6,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 pkl_dirs = [
-    "/data3/extracted_data/close_laptop_100/demos",
+    "/home/ripl/openteach/extracted_data/cups_demonstrations/pickle_files",
+    "/home/ripl/openteach/extracted_data/laptop_demonstrations/pickle_files",
+    "/home/ripl/openteach/extracted_data/coke_demonstrations/pickle_files",
+    "/home/ripl/openteach/extracted_data/blocks_demonstrations2/pickle_files",
 ]
-stem = '/data3/rlbench_demos/icra_resubmission/converted'
-pkl_dirs = [os.path.join(stem, x) for x in os.listdir(stem)]
+# stem = '/data3/rlbench_demos/icra_resubmission/converted'
+# pkl_dirs = [os.path.join(stem, x) for x in os.listdir(stem)]
 for pkl_dir in pkl_dirs:
     demo_lens = []
     for pkl_file in [x for x in os.listdir(pkl_dir) if x.endswith('.pkl')]:

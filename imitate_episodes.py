@@ -283,13 +283,15 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
 
     # Configure Camera Stream
     overview_subscriber = ZMQCameraSubscriber(
-            host = "143.215.128.151",
+            # host = "143.215.128.151",
+            host = "172.16.0.1",
             port = "10007",
             topic_type = 'RGB'
         )
 
     wrist_subscriber = ZMQCameraSubscriber(
-            host = "143.215.128.151",
+            # host = "143.215.128.151",
+            host = "172.16.0.1",
             port = "10006",
             topic_type = 'RGB'
         )
@@ -335,7 +337,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    max_timesteps = int(400) # may increase for real-world tasks, TODO
+    max_timesteps = int(200) # may increase for real-world tasks, TODO
 
     # num_rollouts = 1
 #     episode_returns = []
