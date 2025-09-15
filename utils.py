@@ -271,13 +271,13 @@ def preproc_imgs(imgs, full_size_img=False):
     assert imgs.shape[0] == 1
     assert imgs.shape[1] == 3
 
-    imgs = imgs[0, 1:]  # Use wrist and front cam
+    imgs = imgs[0, 2:]  # Use wrist and front cam
     if imgs.shape[1] == 256:
-        assert imgs.shape == (2, 256, 256, 3)
+        assert imgs.shape == (1, 256, 256, 3)
     else:
-        assert imgs.shape == (2, 360, 640, 3)
+        assert imgs.shape == (1, 360, 640, 3)
         imgs = imgs[:, :, 140: 500]
-        assert imgs.shape == (2, 360, 360, 3)
+        assert imgs.shape == (1, 360, 360, 3)
         if not full_size_img:
             # downsize to 256 x 256
             resized_imgs = []
@@ -286,14 +286,15 @@ def preproc_imgs(imgs, full_size_img=False):
             imgs = np.stack(resized_imgs, axis=0)
 
     if full_size_img:
-        assert imgs.shape == (2, 360, 360, 3)
+        assert imgs.shape == (1, 360, 360, 3)
     else:
-        assert imgs.shape == (2, 256, 256, 3)
+        assert imgs.shape == (1, 256, 256, 3)
     # convert bgr to rgb
     imgs = imgs[..., ::-1]
     imgs = torch.from_numpy(imgs.copy()).float() / 255.0
     imgs = torch.einsum('k h w c -> k c h w', imgs)
     return imgs
+
 
 
 def get_proprioception(data, gripper_proprio=False):

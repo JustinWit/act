@@ -46,7 +46,8 @@ def main(args):
     # else:
     # task_config = TASK_CONFIGS[task_name]
     # episode_len = task_config['episode_len']
-    camera_names = ['wrist_camera', 'front_camera']
+    # camera_names = ['wrist_camera', 'front_camera']
+    camera_names = ['front_camera']
 
     # fixed parameters
     state_dim = 7
@@ -337,7 +338,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    max_timesteps = int(200) # may increase for real-world tasks, TODO
+    max_timesteps = int(150) # may increase for real-world tasks, TODO
 
     # num_rollouts = 1
 #     episode_returns = []
@@ -462,7 +463,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
                 curr_image_np = np.transpose(curr_image_np, (0, 2, 3, 1))
 
                 # Display the image Press 'q' to exit
-                cv2.imshow("Camera", cv2.cvtColor(np.hstack((curr_image_np[0], curr_image_np[1])), cv2.COLOR_RGB2BGR))
+                cv2.imshow("Camera", cv2.cvtColor(curr_image_np[0], cv2.COLOR_RGB2BGR))
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
