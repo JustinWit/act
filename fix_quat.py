@@ -1,10 +1,9 @@
-import os
 import pickle as pkl
-from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 import numpy as np
-from deoxys_transform_utils import quat2axisangle, axisangle2quat, mat2quat, quat_multiply
+
+from deoxys_transform_utils import axisangle2quat, mat2quat, quat2axisangle, quat_multiply
 
 APPLY_FIX = True
 
@@ -32,12 +31,12 @@ def get_action(root, absolute=False):
         if APPLY_FIX:
             rot = np.array([
                 quat2axisangle(quat_multiply(i, j)) if  quat2axisangle(quat_multiply(i, j))[0] > 0.0 else  quat2axisangle(-quat_multiply(i, j)) for i,j in \
-                    zip(quat_rot_actions, root['eef_quat'])
+                    zip(quat_rot_actions, root['eef_quat'], strict=True)
                     ])
         else:
             rot = np.array([
                 quat2axisangle(quat_multiply(i, j)) for i,j in \
-                    zip(quat_rot_actions, root['eef_quat'])
+                    zip(quat_rot_actions, root['eef_quat'], strict=True)
                     ])
         arm_action = np.hstack((pos, rot))
     else:

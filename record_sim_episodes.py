@@ -1,16 +1,17 @@
-import time
-import os
-import numpy as np
 import argparse
-import matplotlib.pyplot as plt
+import os
+import time
+
 import h5py
+import IPython
+import matplotlib.pyplot as plt
+import numpy as np
 
 from constants import PUPPET_GRIPPER_POSITION_NORMALIZE_FN, SIM_TASK_CONFIGS
 from ee_sim_env import make_ee_sim_env
-from sim_env import make_sim_env, BOX_POSE
-from scripted_policy import PickAndTransferPolicy, InsertionPolicy
+from scripted_policy import InsertionPolicy, PickAndTransferPolicy
+from sim_env import BOX_POSE, make_sim_env
 
-import IPython
 e = IPython.embed
 
 
@@ -75,7 +76,7 @@ def main(args):
         joint_traj = [ts.observation['qpos'] for ts in episode]
         # replace gripper pose with gripper control
         gripper_ctrl_traj = [ts.observation['gripper_ctrl'] for ts in episode]
-        for joint, ctrl in zip(joint_traj, gripper_ctrl_traj):
+        for joint, ctrl in zip(joint_traj, gripper_ctrl_traj, strict=True):
             left_ctrl = PUPPET_GRIPPER_POSITION_NORMALIZE_FN(ctrl[0])
             right_ctrl = PUPPET_GRIPPER_POSITION_NORMALIZE_FN(ctrl[2])
             joint[6] = left_ctrl
@@ -184,6 +185,6 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_dir', action='store', type=str, help='dataset saving dir', required=True)
     parser.add_argument('--num_episodes', action='store', type=int, help='num_episodes', required=False)
     parser.add_argument('--onscreen_render', action='store_true')
-    
+
     main(vars(parser.parse_args()))
 

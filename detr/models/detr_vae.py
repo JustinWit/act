@@ -2,15 +2,15 @@
 """
 DETR model and criterion classes.
 """
+import IPython
+import numpy as np
 import torch
 from torch import nn
 from torch.autograd import Variable
+
 from .backbone import build_backbone
-from .transformer import build_transformer, TransformerEncoder, TransformerEncoderLayer
+from .transformer import TransformerEncoder, TransformerEncoderLayer, build_transformer
 
-import numpy as np
-
-import IPython
 e = IPython.embed
 
 

@@ -1,10 +1,8 @@
 import os
 import pickle as pkl
-from tqdm import tqdm
 
-import matplotlib.pyplot as plt
 import numpy as np
-
+from tqdm import tqdm
 
 """
 Utility functions of matrix and vector transformations.
@@ -13,8 +11,6 @@ NOTE: convention for quaternions is (x, y, z, w)
 """
 
 import math
-
-import numpy as np
 
 # from deoxys.utils.numba import jit_decorator
 

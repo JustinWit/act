@@ -1,9 +1,8 @@
 import os
 import pickle as pkl
-from tqdm import tqdm
-import numpy as np
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 pkl_dirs = [
     "/home/ripl/openteach/extracted_data/cups_demonstrations/pickle_files",

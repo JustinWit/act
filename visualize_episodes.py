@@ -1,13 +1,14 @@
+import argparse
 import os
-import numpy as np
+
 import cv2
 import h5py
-import argparse
-
+import IPython
 import matplotlib.pyplot as plt
+import numpy as np
+
 from constants import DT
 
-import IPython
 e = IPython.embed
 
 JOINT_NAMES = ["waist", "shoulder", "elbow", "forearm_roll", "wrist_angle", "wrist_rotate"]
@@ -25,7 +26,7 @@ def load_hdf5(dataset_dir, dataset_name):
         qvel = root['/observations/qvel'][()]
         action = root['/action'][()]
         image_dict = dict()
-        for cam_name in root[f'/observations/images/'].keys():
+        for cam_name in root['/observations/images/'].keys():
             image_dict[cam_name] = root[f'/observations/images/{cam_name}'][()]
 
     return qpos, qvel, action, image_dict
@@ -125,13 +126,13 @@ def visualize_timestamp(t_list, dataset_path):
 
     ax = axs[0]
     ax.plot(np.arange(len(t_float)), t_float)
-    ax.set_title(f'Camera frame timestamps')
+    ax.set_title('Camera frame timestamps')
     ax.set_xlabel('timestep')
     ax.set_ylabel('time (sec)')
 
     ax = axs[1]
     ax.plot(np.arange(len(t_float)-1), t_float[:-1] - t_float[1:])
-    ax.set_title(f'dt')
+    ax.set_title('dt')
     ax.set_xlabel('timestep')
     ax.set_ylabel('time (sec)')
 

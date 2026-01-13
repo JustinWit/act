@@ -1,17 +1,17 @@
+import os
+
+import cv2
+import h5py
+
+# from scipy.spatial.transform import Rotation as R
+import IPython
 import numpy as np
 import torch
-import os
-import h5py
-import pickle as pkl
-from torch.utils.data import TensorDataset, DataLoader
-import matplotlib.pyplot as plt
+from torch.utils.data import DataLoader
 from tqdm import tqdm
-import cv2
-from deoxys_transform_utils import quat2axisangle, axisangle2quat, quat_multiply, mat2quat
-import h5py
-# from scipy.spatial.transform import Rotation as R
 
-import IPython
+from deoxys_transform_utils import axisangle2quat, mat2quat, quat2axisangle, quat_multiply
+
 e = IPython.embed
 
 
@@ -234,7 +234,7 @@ def get_action(root, absolute=False):
         quat_rot_actions = [axisangle2quat(x) for x in root['arm_action'][:, 3:]]
         rot = np.array([
             quat2axisangle(quat_multiply(i, j)) if quat2axisangle(quat_multiply(i, j))[0] > 0.0 else quat2axisangle(-quat_multiply(i, j)) for i,j in \
-                zip(quat_rot_actions, root['eef_quat'])
+                zip(quat_rot_actions, root['eef_quat'], strict=True)
                 ])
         arm_action = np.hstack((pos, rot))
     else:
@@ -249,7 +249,7 @@ def get_action_chunk(eef_pos, eef_quat, arm_action, gripper_action, absolute=Fal
         quat_rot_actions = [axisangle2quat(x) for x in arm_action[:, 3:]]
         rot = np.array([
             quat2axisangle(quat_multiply(i, j)) if quat2axisangle(quat_multiply(i, j))[0] > 0.0 else quat2axisangle(-quat_multiply(i, j)) for i,j in \
-                zip(quat_rot_actions, eef_quat)
+                zip(quat_rot_actions, eef_quat, strict=True)
                 ])
 
         arm_action = np.hstack((pos, rot))
@@ -319,7 +319,7 @@ def get_single_proprioception(gripper, eef_pose, eef_pos, gripper_proprio=False)
     return qpos
 
 def collate_fn(batch):
-    image_data, qpos_data, action_data, is_pad = zip(*batch)
+    image_data, qpos_data, action_data, is_pad = zip(*batch, strict=True)
 
     image_data = torch.stack(image_data)
     qpos_data = torch.stack(qpos_data)

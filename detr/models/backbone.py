@@ -2,20 +2,18 @@
 """
 Backbone modules.
 """
-from collections import OrderedDict
 
+from typing import List
+
+import IPython
 import torch
-import torch.nn.functional as F
 import torchvision
 from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
-from typing import Dict, List
-
 from util.misc import NestedTensor, is_main_process
 
 from .position_encoding import build_position_encoding
 
-import IPython
 e = IPython.embed
 
 class FrozenBatchNorm2d(torch.nn.Module):

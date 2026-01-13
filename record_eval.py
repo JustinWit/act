@@ -1,9 +1,11 @@
-from openteach.utils.network import ZMQCameraSubscriber
-import cv2
-import threading
-from time import sleep
 import datetime
 import os
+import threading
+from time import sleep
+
+import cv2
+from openteach.utils.network import ZMQCameraSubscriber
+
 
 class RecordEval():
     def __init__(self, ckpt_name, port_num, name_suffix=''):

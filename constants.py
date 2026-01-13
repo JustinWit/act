@@ -1,4 +1,5 @@
 import pathlib
+
 from easydict import EasyDict
 
 ### Task parameters

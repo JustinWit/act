@@ -1,29 +1,30 @@
-import torch
-import numpy as np
+import argparse
 import os
 import pickle
-import argparse
-import matplotlib.pyplot as plt
-from copy import deepcopy
-from tqdm import tqdm
-from einops import rearrange
 
-from constants import DT
-from constants import PUPPET_GRIPPER_JOINT_OPEN
-from utils import load_data, preproc_imgs # data functions
-from utils import sample_box_pose, sample_insertion_pose # robot functions
-from utils import compute_dict_mean, set_seed, detach_dict, combined_std # helper functions
-from policy import ACTPolicy, CNNMLPPolicy
-from visualize_episodes import save_videos
-
-from sim_env import BOX_POSE
 # from constants import TASK_CONFIGS
-
 import IPython
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from einops import rearrange
+from tqdm import tqdm
+
+from policy import ACTPolicy, CNNMLPPolicy
+from utils import (  # data functions  # robot functions  # helper functions
+    combined_std,
+    compute_dict_mean,
+    detach_dict,
+    load_data,
+    preproc_imgs,
+    set_seed,
+)
+
 e = IPython.embed
 import time
 
 import wandb
+
 
 def main(args):
     set_seed(1)
@@ -190,7 +191,7 @@ def main(args):
     # save dataset stats
     if not os.path.isdir(ckpt_dir):
         os.makedirs(ckpt_dir)
-    stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
+    stats_path = os.path.join(ckpt_dir, 'dataset_stats.pkl')
     with open(stats_path, 'wb') as f:
         pickle.dump(final_stats, f)
 
@@ -238,14 +239,14 @@ def get_image(ts, camera_names):
 
 def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     # Imports for controlling Robot
-    from openteach.utils.network import ZMQCameraSubscriber
-    from deoxys.franka_interface import FrankaInterface
-    from deoxys.utils.config_utils import get_default_controller_config
+    import cv2
     from deoxys.experimental.motion_utils import reset_joints_to
+    from deoxys.franka_interface import FrankaInterface
+    from openteach.utils.network import ZMQCameraSubscriber
+
     # from deoxys.utils.transform_utils import quat2axisangle, mat2quat, euler2mat
     # from scipy.spatial.transform import Rotation as R
     from deoxys_transform_utils import quat2axisangle
-    import cv2
     from record_eval import RecordEval
 
     # ACT variables
@@ -269,7 +270,7 @@ def eval_bc(config, ckpt_name, proprioception, save_episode=True):
     policy.cuda()
     policy.eval()
     print(f'Loaded: {ckpt_path}')
-    stats_path = os.path.join(ckpt_dir, f'dataset_stats.pkl')
+    stats_path = os.path.join(ckpt_dir, 'dataset_stats.pkl')
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
         assert stats['use_proprioception'] == proprioception
@@ -606,7 +607,7 @@ def train_bc(train_dataloader, real_train_dataloader, val_dataloader, config):
             torch.save(policy.state_dict(), ckpt_path)
             plot_history(train_history, validation_history, epoch, ckpt_dir, seed)
 
-    ckpt_path = os.path.join(ckpt_dir, f'policy_last.ckpt')
+    ckpt_path = os.path.join(ckpt_dir, 'policy_last.ckpt')
     torch.save(policy.state_dict(), ckpt_path)
 
     # best_epoch, min_val_loss, best_state_dict = best_ckpt_info

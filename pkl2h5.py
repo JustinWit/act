@@ -1,8 +1,8 @@
-import h5py
-import pickle as pkl
-import numpy as np
-import os
 import argparse
+import os
+import pickle as pkl
+
+import h5py
 from tqdm import tqdm
 
 # Parse command-line arguments

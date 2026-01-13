@@ -1,10 +1,12 @@
-import os
-import cv2
-import numpy as np
 # from skimage.metrics import structural_similarity as ssim
 import argparse
-from openteach.utils.network import ZMQCameraSubscriber
+import os
+
+import cv2
 import matplotlib.pyplot as plt
+import numpy as np
+from openteach.utils.network import ZMQCameraSubscriber
+
 
 def read_first_frame(video_path):
     cap = cv2.VideoCapture(video_path)
